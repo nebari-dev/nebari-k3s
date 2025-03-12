@@ -1,0 +1,19 @@
+---
+- name: Create .env file for Makefile usage in playground directory
+  ansible.builtin.copy:
+    dest: "/tmp/.env"
+    content: |
+      REMOTE_USER={{ ansible_user }}
+      REMOTE_HOST={{ hostvars[groups['master'][0]].ansible_host }}
+      REMOTE_HOME='/home/{{ ansible_user }}'
+      TMP_DIR={{ tmp_dir | default('/tmp/kubeconfig') }}
+      KUBECONFIG_MASTER={{ k3s_server_location }}/k3s.yaml
+      REMOTE_KUBECONFIG=$REMOTE_HOME/.kube/config
+      SSH_KEY_FILE={{ ansible_ssh_private_key_file }}
+    mode: '0644'
+
+- name: Fetch .env file to local
+  ansible.builtin.fetch:
+    src: "/tmp/.env"
+    dest: "{{ hostvars[groups['master'][0]]['playbook_dir'] }}/"
+    flat: yes

@@ -1,0 +1,184 @@
+---
+
+- name: Install UFW
+  ansible.builtin.package:
+    name: ufw
+    state: present
+  when : ansible_os_family == 'Debian'
+
+- name: Allow base ports (tcp)
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  with_items:
+    - 6443
+    - 443
+    - 7946
+  when : ansible_os_family == 'Debian'
+
+- name: Allow base ports (udp)
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: udp
+  with_items:
+    - 6443
+    - 443
+    - 7946
+  when : ansible_os_family == 'Debian'
+
+# https://infotechys.com/install-a-kubernetes-cluster-on-rhel-9/
+
+# =====================================================================
+# Step 1: Install Kernel Headers
+# =====================================================================
+- name: Install kernel headers (kernel-devel) for current kernel
+  ansible.builtin.package:
+    name: "kernel-devel-{{ ansible_kernel }}"
+    state: present
+  when: ansible_os_family == "RedHat"
+
+# =====================================================================
+# Step 2: Add / Load Kernel Modules for Kubernetes
+# =====================================================================
+- name: Create modules-load file for Kubernetes
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/kubernetes.conf
+    content: |
+      br_netfilter
+      ip_vs
+      ip_vs_rr
+      ip_vs_wrr
+      ip_vs_sh
+      overlay
+    mode: '0644'
+  when: ansible_os_family == "RedHat"
+
+- name: Load required kernel modules
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - br_netfilter
+    - ip_vs
+    - ip_vs_rr
+    - ip_vs_wrr
+    - ip_vs_sh
+    - overlay
+  when: ansible_os_family == "RedHat"
+
+# =====================================================================
+# Step 3: Configure Sysctl
+# =====================================================================
+- name: Create sysctl config for Kubernetes
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/kubernetes.conf
+    content: |
+      net.ipv4.ip_forward = 1
+      net.bridge.bridge-nf-call-ip6tables = 1
+      net.bridge.bridge-nf-call-iptables = 1
+    mode: '0644'
+  when: ansible_os_family == "RedHat"
+
+- name: Reload sysctl settings
+  ansible.builtin.command: sysctl --system
+  when: ansible_os_family == "RedHat"
+
+# =====================================================================
+# (Optional) Disable SELinux
+# =====================================================================
+# - name: Set SELinux to disabled state
+#   ansible.posix.selinux:
+#     state: disabled
+#   when: ansible_os_family == "RedHat"
+
+# =====================================================================
+# (Optional) Steps 5: Install and Configure Containerd
+#   (commented out for brevity)
+# =====================================================================
+
+# =====================================================================
+# Step 6: Set Firewall Rules for Kubernetes
+# =====================================================================
+- name: Open HTTP and HTTPS ports in Firewalld
+  ansible.posix.firewalld:
+    port: "{{ item }}/tcp"
+    permanent: yes
+    state: enabled
+    zone: public
+    immediate: yes
+  loop:
+    - 80
+    - 8443
+    - 8080
+    - 443
+    - 9990 # Keycloak management console
+  when: ansible_os_family == "RedHat"
+
+- name: Open Kubernetes-related ports in Firewalld (TCP)
+  ansible.posix.firewalld:
+    port: "{{ item }}/tcp"
+    permanent: yes
+    state: enabled
+    zone: public
+    immediate: yes
+  loop:
+    - 6443
+    - 2379-2380
+    - 10250
+    - 10251
+    - 10252
+    - 10255
+    - 5473
+  when: ansible_os_family == "RedHat"
+
+- name: Open Kubernetes-related ports in Firewalld (UDP)
+  ansible.posix.firewalld:
+    port: "{{ item }}/udp"
+    permanent: yes
+    state: enabled
+    zone: public
+    immediate: yes
+  loop:
+    - 8473
+    - 51820
+    - 51821
+  when: ansible_os_family == "RedHat"
+
+# ---------------------------------------------------------------------
+# Add the two "trusted" sources for pods and services
+# ---------------------------------------------------------------------
+# https://docs.k3s.io/installation/requirements#operating-systems
+
+- name: Allow pod subnet in the trusted zone
+  ansible.posix.firewalld:
+    source: 10.42.0.0/16
+    zone: trusted
+    state: enabled
+    permanent: yes
+    immediate: yes
+  when: ansible_os_family == "RedHat"
+
+- name: Allow service subnet in the trusted zone
+  ansible.posix.firewalld:
+    source: 10.43.0.0/16
+    zone: trusted
+    state: enabled
+    permanent: yes
+    immediate: yes
+  when: ansible_os_family == "RedHat"
+# ---------------------------------------------------------------------
+
+- name: Reload firewalld
+  ansible.posix.firewalld:
+    state: enabled
+    immediate: yes
+  when: ansible_os_family == "RedHat"
+
+# =====================================================================
+# (Optional) Reboot System
+# =====================================================================
+# - name: Reboot the machine (Optional)
+#   ansible.builtin.reboot:
+#   when: ansible_os_family == "RedHat"

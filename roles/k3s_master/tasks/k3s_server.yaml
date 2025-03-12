@@ -1,0 +1,80 @@
+---
+
+- name: Download k3s installation script
+  get_url:
+    url: https://get.k3s.io
+    dest: /tmp/install_k3s.sh
+    mode: "u=rwx,g=rx,o=rx"
+
+- name: Install k3s server
+  command: /tmp/install_k3s.sh server {{ extra_server_args }} --cluster-init
+  args:
+    chdir: /tmp
+  register: k3s_server
+
+- name: Verification
+  when: not ansible_check_mode
+  block:
+    - name: Verify that all nodes actually joined (check k3s-init.service logs)
+      ansible.builtin.command:
+        cmd: "{{ k3s_binary_path | default('k3s') }} kubectl get nodes -l 'node-role.kubernetes.io/master=true' -o=jsonpath='{.items[*].metadata.name}'"
+      register: nodes
+      until: nodes.rc == 0 and (nodes.stdout.split() | length) == (groups[group_name_master | default('master')] | length)
+      retries: "{{ retry_count | default(20) }}"
+      delay: 10
+      changed_when: false
+  always:
+    - name: Save logs of k3s-init.service
+      ansible.builtin.include_tasks: fetch_k3s_init_logs.yml
+      when: log_destination
+      vars:
+        log_destination: >-
+          {{ lookup('ansible.builtin.env', 'ANSIBLE_K3S_LOG_DIR', default=False) }}
+
+# - name: Wait for node-token
+#   wait_for:
+#     path: "{{ k3s_server_location }}/server/node-token"
+
+# - name: Register node-token file access mode
+#   stat:
+#     path: "{{ k3s_server_location }}/server/node-token"
+#   register: p
+
+# - name: Change file access for node-token
+#   file:
+#     path: "{{ k3s_server_location }}/server/node-token"
+#     mode: "g+rx,o+rx"
+
+# - name: Fetch node-token from master to control machine
+#   fetch:
+#     src: "{{ k3s_server_location }}/server/node-token"
+#     dest: "/tmp/k3s_token"
+#     flat: yes  # Ensures the file is stored directly in /tmp, not under a subdirectory
+
+# - name: Restore node-token file access
+#   file:
+#     path: "{{ k3s_server_location }}/server/node-token"
+#     mode: "{{ p.stat.mode }}"
+
+
+- name: Create directory .kube
+  file:
+    path: ~{{ ansible_user }}/.kube
+    state: directory
+    owner: "{{ ansible_user }}"
+    mode: "u=rwx,g=rx,o="
+
+- name: Copy config file to user home directory
+  copy:
+    src: /etc/rancher/k3s/k3s.yaml
+    dest: ~{{ ansible_user }}/.kube/config
+    remote_src: yes
+    owner: "{{ ansible_user }}"
+    mode: "u=rw,g=,o="
+
+- name: Replace cluster address with kube-vip address (apiserver_endpoint)
+  ansible.builtin.replace:
+    path: "~{{ ansible_user }}/.kube/config"
+    regexp: '^(\s*server:\s+)https://.*'
+    replace: '\1https://{{ apiserver_endpoint }}:6443'
+    backup: yes

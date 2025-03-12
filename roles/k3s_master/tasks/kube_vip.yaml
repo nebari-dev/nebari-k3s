@@ -1,0 +1,25 @@
+---
+
+- name: Create manifests directory
+  ansible.builtin.file:
+    path: '{{ k3s_server_location }}/server/manifests/'
+    state: directory
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Download kube-vip manifests
+  ansible.builtin.get_url:
+    url: https://kube-vip.io/manifests/rbac.yaml
+    dest: '{{ k3s_server_location }}/server/manifests/vip-rbac.yaml'
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Copy new kube-vip DaemonSet Manifest
+  ansible.builtin.template:
+    src: vip.yaml.j2
+    dest: '{{ k3s_server_location }}/server/manifests/vip.yaml'
+    owner: root
+    group: root
+    mode: "0644"

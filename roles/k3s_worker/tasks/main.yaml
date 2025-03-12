@@ -1,0 +1,22 @@
+---
+- name: Download k3s install script
+  ansible.builtin.get_url:
+    url: https://get.k3s.io
+    dest: /tmp/install_k3s.sh
+    mode: '0755'
+
+
+# - name: Check if k3s is already installed
+#   ansible.builtin.stat:
+#     path: /usr/local/bin/k3s
+#   register: k3s_installed
+
+- name: Install k3s worker (only if not installed)
+  ansible.builtin.shell: |
+    /tmp/install_k3s.sh agent \
+      --token={{ k3s_token }} \
+      --server https://{{ apiserver_endpoint }}:6443 \
+      --flannel-iface=eth1
+
+
+  # when: not k3s_installed.stat.exists

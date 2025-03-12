@@ -1,0 +1,107 @@
+---
+
+# kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.13.9/config/manifests/metallb-native.yaml
+
+- name: Create manifests directory
+  ansible.builtin.file:
+    path: '{{ k3s_server_location }}/server/manifests/'
+    state: directory
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Download MetalLB manifests
+  ansible.builtin.get_url:
+    url: https://raw.githubusercontent.com/metallb/metallb/{{ metal_lb_tag_version }}/config/manifests/metallb-native.yaml
+    dest: '{{ k3s_server_location }}/server/manifests/metallb.yaml'
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Create manifests directory for temp configuration
+  ansible.builtin.file:
+    path: /tmp/k3s
+    state: directory
+    owner: "{{ ansible_user_id }}"
+    mode: "0755"
+  with_items: "{{ groups[group_name_master | default('master')] }}"
+  run_once: true
+
+- name: Copy metallb CRs manifest to first master
+  ansible.builtin.template:
+    src: metallb.crs.j2
+    dest: /tmp/k3s/metallb-crs.yaml
+    owner: "{{ ansible_user_id }}"
+    mode: "0755"
+  with_items: "{{ groups[group_name_master | default('master')] }}"
+  run_once: true
+
+- name: Test metallb-system namespace
+  ansible.builtin.command: >-
+    {{ k3s_binary_path | default('k3s') }} kubectl -n metallb-system
+  changed_when: false
+  with_items: "{{ groups[group_name_master | default('master')] }}"
+  run_once: true
+
+- name: Wait for MetalLB resource "{{ item.description }}"
+  ansible.builtin.command: >
+    {{ k3s_binary_path | default('k3s') }} kubectl wait {{ item.resource }}
+    {% if item.name is defined %} {{ item.name }} {% endif %}
+    --namespace=metallb-system
+    {% if item.selector is defined %} --selector="{{ item.selector }}" {% endif %}
+    {% if item.condition is defined %} {{ item.condition }} {% endif %}
+    --timeout=120s
+  register: metallb_wait
+  until: metallb_wait.rc == 0
+  retries: 10
+  delay: 15
+  loop:
+    - { description: "controller", resource: "deployment", name: "controller", condition: "--for=condition=Available" }
+    - { description: "webhook service", resource: "pod", selector: "component=controller", condition: "--for=jsonpath='{.status.phase}'=Running" }
+    - { description: "pods in replica sets", resource: "pod", selector: "component=controller,app=metallb", condition: "--for=condition=Ready" }
+    - { description: "ready replicas of controller", resource: "replicaset", selector: "component=controller,app=metallb", condition: "--for=jsonpath='{.status.readyReplicas}'=1" }
+    - { description: "fully labeled replicas of controller", resource: "replicaset", selector: "component=controller,app=metallb", condition: "--for=jsonpath='{.status.fullyLabeledReplicas}'=1" }
+    - { description: "available replicas of controller", resource: "replicaset", selector: "component=controller,app=metallb", condition: "--for=jsonpath='{.status.availableReplicas}'=1" }
+  loop_control:
+    label: "{{ item.description }}"
+
+
+- name: Set metallb webhook service name
+  ansible.builtin.set_fact:
+    metallb_webhook_service_name: >-
+      {{
+        (
+          (metal_lb_controller_tag_version | regex_replace('^v', ''))
+          is
+          version('0.14.4', '<', version_type='semver')
+        ) | ternary(
+          'webhook-service',
+          'metallb-webhook-service'
+        )
+      }}
+
+- name: Test metallb-system webhook-service endpoint
+  ansible.builtin.command: >-
+    {{ k3s_binary_path | default('k3s') }} kubectl -n metallb-system get endpoints {{ metallb_webhook_service_name }}
+  changed_when: false
+  with_items: "{{ groups[group_name_master | default('master')] }}"
+  run_once: true
+
+- name: Apply metallb CRs
+  ansible.builtin.command: >-
+    {{ k3s_binary_path | default('k3s') }} kubectl apply -f /tmp/k3s/metallb-crs.yaml
+    --timeout=120s
+  register: this
+  changed_when: false
+  run_once: true
+  until: this.rc == 0
+  retries: 5
+
+- name: Test metallb-system resources for Layer 2 configuration
+  ansible.builtin.command: >-
+    {{ k3s_binary_path | default('k3s') }} kubectl -n metallb-system get {{ item }}
+  changed_when: false
+  run_once: true
+  with_items:
+    - IPAddressPool
+    - L2Advertisement
