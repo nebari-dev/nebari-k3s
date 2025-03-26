@@ -90,12 +90,12 @@
 - name: Apply metallb CRs
   ansible.builtin.command: >-
     {{ k3s_binary_path | default('k3s') }} kubectl apply -f /tmp/k3s/metallb-crs.yaml
-    --timeout=120s
+    --timeout=15s
   register: this
   changed_when: false
   run_once: true
   until: this.rc == 0
-  retries: 5
+  retries: 3
 
 - name: Test metallb-system resources for Layer 2 configuration
   ansible.builtin.command: >-

@@ -1,4 +1,17 @@
 ---
+# =====================================================================
+# Step 0: Disable Swap
+# =====================================================================
+# https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/#swap-configuration
+# - name: Disable swap
+#   ansible.builtin.command: swapoff -a
+#   when: ansible_swaptotal_mb > 0
+
+# # Comment out swap lines in /etc/fstab for persistence
+# - name: Comment out swap lines in /etc/fstab
+#   ansible.builtin.shell: sed -i '/swap/s/^/#/' /etc/fstab
+#   when: ansible_swaptotal_mb > 0
+
 
 - name: Install UFW
   ansible.builtin.package:
@@ -14,7 +27,7 @@
   with_items:
     - 6443
     - 443
-    - 7946
+    - 7946 # Metallb
   when : ansible_os_family == 'Debian'
 
 - name: Allow base ports (udp)
@@ -25,7 +38,7 @@
   with_items:
     - 6443
     - 443
-    - 7946
+    - 7946 # Metallb
   when : ansible_os_family == 'Debian'
 
 # https://infotechys.com/install-a-kubernetes-cluster-on-rhel-9/
@@ -66,6 +79,13 @@
     - ip_vs_wrr
     - ip_vs_sh
     - overlay
+  when: ansible_os_family == "RedHat"
+
+# Install nfs-common package for NFS storage mounting
+- name: Install nfs-common package
+  ansible.builtin.package:
+    name: nfs-utils
+    state: present
   when: ansible_os_family == "RedHat"
 
 # =====================================================================
@@ -114,6 +134,7 @@
     - 8080
     - 443
     - 9990 # Keycloak management console
+    - 7946 # Metallb
   when: ansible_os_family == "RedHat"
 
 - name: Open Kubernetes-related ports in Firewalld (TCP)
@@ -131,6 +152,7 @@
     - 10252
     - 10255
     - 5473
+    - 7946 # Metallb
   when: ansible_os_family == "RedHat"
 
 - name: Open Kubernetes-related ports in Firewalld (UDP)
@@ -144,6 +166,7 @@
     - 8473
     - 51820
     - 51821
+    - 7946 # Metallb
   when: ansible_os_family == "RedHat"
 
 # ---------------------------------------------------------------------
@@ -182,3 +205,12 @@
 # - name: Reboot the machine (Optional)
 #   ansible.builtin.reboot:
 #   when: ansible_os_family == "RedHat"
+
+- name: Set containerd pull schema env var system-wide
+  ansible.builtin.lineinfile:
+    path: /etc/environment
+    regexp: '^CONTAINERD_ENABLE_DEPRECATED_PULL_SCHEMA_1_IMAGE='
+    line: 'CONTAINERD_ENABLE_DEPRECATED_PULL_SCHEMA_1_IMAGE=1'
+    create: yes
+    state: present
+  when: ansible_os_family == "RedHat"

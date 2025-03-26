@@ -1,4 +1,23 @@
 ---
+# - name: Verification
+#   when: not ansible_check_mode
+#   block:
+#     - name: Verify that all nodes actually joined (check k3s-init.service logs)
+#       ansible.builtin.command:
+#         cmd: "{{ k3s_binary_path | default('k3s') }} kubectl get nodes -l 'node-role.kubernetes.io/master=true' -o=jsonpath='{.items[*].metadata.name}'"
+#       register: nodes
+#       until: nodes.rc == 0 and (nodes.stdout.split() | length) == (groups['master'] | length)
+#       retries: "{{ retry_count | default(20) }}"
+#       delay: 10
+#       changed_when: false
+#   always:
+#     - name: Save logs of k3s-init.service
+#       ansible.builtin.include_tasks: fetch_k3s_init_logs.yml
+#       when: log_destination
+#       vars:
+#         log_destination: >-
+#           {{ lookup('ansible.builtin.env', 'ANSIBLE_K3S_LOG_DIR', default=False) }}
+
 - name: Create .env file for Makefile usage in playground directory
   ansible.builtin.copy:
     dest: "/tmp/.env"
@@ -8,12 +27,14 @@
       REMOTE_HOME='/home/{{ ansible_user }}'
       TMP_DIR={{ tmp_dir | default('/tmp/kubeconfig') }}
       KUBECONFIG_MASTER={{ k3s_server_location }}/k3s.yaml
-      REMOTE_KUBECONFIG=$REMOTE_HOME/.kube/config
+      REMOTE_KUBECONFIG='/home/{{ ansible_user }}/.kube/config'
       SSH_KEY_FILE={{ ansible_ssh_private_key_file }}
     mode: '0644'
+  when: inventory_hostname == groups['master'][0]
 
 - name: Fetch .env file to local
   ansible.builtin.fetch:
     src: "/tmp/.env"
     dest: "{{ hostvars[groups['master'][0]]['playbook_dir'] }}/"
     flat: yes
+  when: inventory_hostname == groups['master'][0]

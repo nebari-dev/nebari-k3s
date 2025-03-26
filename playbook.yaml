@@ -7,6 +7,8 @@
 
 - hosts: master
   become: true
+  gather_facts: true
+  serial: 1
   roles:
     - role: k3s_master
     - role: post_master

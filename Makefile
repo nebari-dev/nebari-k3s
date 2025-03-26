@@ -14,7 +14,7 @@ REMOTE_KUBECONFIG ?= $(REMOTE_HOME)/.kube/config
 
 ssh-add:
 	@echo "Adding SSH key: $(SSH_KEY_FILE)..."
-	ssh-add $(SSH_KEY_FILE) || true
+	ssh-add $(SSH_KEY_FILE)
 
 $(TMP_DIR):
 	mkdir -p $(TMP_DIR)
@@ -30,24 +30,22 @@ backup:
 
 copy: $(TMP_DIR)
 	@echo "Copying remote kubeconfig..."
-	scp -i $(SSH_KEY_FILE) $(REMOTE_USER)@$(REMOTE_HOST):$(REMOTE_KUBECONFIG) \
-		$(TMP_DIR)/remote.config \
-		|| touch $(TMP_DIR)/remote.config
+	vagrant scp hpc-master-01:$(REMOTE_HOME)/.kube/config $(TMP_DIR)/remote.config
 
 merge: backup copy
 	@echo "Merging kubeconfig files..."
-	KUBECONFIG=$(LOCAL_KUBECONFIG):$(TMP_DIR)/remote.config \
-		kubectl config view --flatten > $(TMP_DIR)/final.config
-
+	KUBECONFIG=$(TMP_DIR)/remote.config:$(LOCAL_KUBECONFIG) \
+		kubectl config view --raw --flatten > $(TMP_DIR)/final.config
+	chmod 600 $(TMP_DIR)/final.config
 	@echo "Merged kubeconfig is now at: $(TMP_DIR)/final.config"
 
 apply: merge
 	@echo "Replacing local kubeconfig with merged config..."
 	mkdir -p $(HOME)/.kube
-	cp $(TMP_DIR)/final.config $(LOCAL_KUBECONFIG)
+	mv $(TMP_DIR)/final.config $(LOCAL_KUBECONFIG)
 	@echo "Local kubeconfig updated successfully."
 
 clean:
 	rm -rf $(TMP_DIR)
 
-all: ssh-add apply clean
+all: ssh-add apply

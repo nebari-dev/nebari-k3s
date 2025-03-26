@@ -14,9 +14,16 @@
 - name: Install k3s worker (only if not installed)
   ansible.builtin.shell: |
     /tmp/install_k3s.sh agent \
+      --flannel-iface=eth1 \
       --token={{ k3s_token }} \
       --server https://{{ apiserver_endpoint }}:6443 \
-      --flannel-iface=eth1
+
+# - name: Join other masters to the cluster
+#   command: /tmp/install_k3s.sh server --token {{ k3s_token }} --tls-san {{ apiserver_endpoint }} --disable servicelb --disable traefik --server https://{{ groups['master'][0] }}:6443
+#   args:
+#     chdir: /tmp
+#   register: k3s_server
+#   when: inventory_hostname != groups['master'][0]
 
 
   # when: not k3s_installed.stat.exists

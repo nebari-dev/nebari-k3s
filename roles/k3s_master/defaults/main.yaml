@@ -21,7 +21,19 @@ extra_server_args: >-
   --disable traefik
   --write-kubeconfig-mode 644
   --flannel-iface={{ flannel_iface }}
-  --token={{ k3s_token }}
+
+# BY default if --cluster-init is not given to any of the master nodes, k3s assumes a
+# single-node kube cluster
+server_init_args: >-
+  {% if groups['master'] | length > 1 %}
+    {% if inventory_hostname == groups['master'][0] %}
+      --cluster-init
+    {% else %}
+      --server https://{{ master_ip | default('') }}:6443
+    {% endif %}
+    --token {{ k3s_token }}
+  {% endif %}
+  {{ extra_server_args }}
 
 # interface which will be used for flannel
 flannel_iface: eth1 # (vagrant uses eth1)

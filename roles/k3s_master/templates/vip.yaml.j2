@@ -17,6 +17,9 @@ spec:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
             - matchExpressions:
+              - key: node-role.kubernetes.io/master
+                operator: Exists
+            - matchExpressions:
               - key: node-role.kubernetes.io/control-plane
                 operator: Exists
       containers:
@@ -42,11 +45,11 @@ spec:
         - name: vip_leaderelection
           value: "true"
         - name: vip_leaseduration
-          value: "15"
+          value: "5"
         - name: vip_renewdeadline
-          value: "10"
+          value: "3"
         - name: vip_retryperiod
-          value: "2"
+          value: "1"
         - name: address
           value: "{{ apiserver_endpoint }}"
         image: ghcr.io/kube-vip/kube-vip:{{ kube_vip_tag_version }}

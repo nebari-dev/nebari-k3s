@@ -3,13 +3,20 @@
 - name: Deploy K3s
   ansible.builtin.include_tasks: k3s_server.yaml
 
+# deploy oncly on first master
 - name: Deploy vip manifest
   ansible.builtin.include_tasks: kube_vip.yaml
+  tags: kube_vip
+  when: inventory_hostname == groups['master'][0]
 
 - name: Deploy metallb manifest
   ansible.builtin.include_tasks: metallb.yaml
   tags: metallb
+  when: inventory_hostname == groups['master'][0]
 
+# deploy once on first master
 - name: Install k9s
   ansible.builtin.include_tasks: k9s_install.yaml
   tags: k9s
+  when: inventory_hostname == groups['master'][0]
+#
