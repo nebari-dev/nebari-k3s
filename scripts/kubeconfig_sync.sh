@@ -1,27 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ -f ./.env ]; then
-  source ./.env
-fi
-
+# ——————————————————————————————————————————————
+# Load & validate environment
 # Required env vars:
-# SSH_USER: user to SSH as (default: root)
-# SSH_HOST: remote host to fetch kubeconfig from (required)
-# SSH_PORT: SSH port (default: 22)
-# SSH_KEY_FILE: path to private key for SSH (required)
-# REMOTE_PATH: remote kubeconfig path (default: ~/.kube/config)
+#   SSH_USER     (default: root)
+#   SSH_HOST     (required)
+#   SSH_PORT     (default: 22)
+#   SSH_KEY_FILE (required)
+#   REMOTE_PATH  (default: ~/.kube/config)
 
 SSH_USER="${SSH_USER:-root}"
 SSH_HOST="${SSH_HOST:?SSH_HOST must be set}"
 SSH_PORT="${SSH_PORT:-22}"
 SSH_KEY_FILE="${SSH_KEY_FILE:?SSH_KEY_FILE must be set}"
 REMOTE_PATH="${REMOTE_PATH:-~/.kube/config}"
-
-add_ssh_key() {
-  echo "Adding SSH key: $SSH_KEY_FILE…"
-  ssh-add "$SSH_KEY_FILE"
-}
 
 create_tmp_dir() {
   mkdir -p /tmp/kubeconfig
@@ -60,7 +53,6 @@ apply_merged_config() {
 }
 
 sync_all() {
-  add_ssh_key
   create_tmp_dir
   copy_kubeconfig
   merge_kubeconfigs
@@ -68,22 +60,17 @@ sync_all() {
   apply_merged_config
 }
 
-# ---------------------------------------------------
-
 main() {
   case "${1:-}" in
     help|-h)
-      echo "Usage: $0 {ssh-add|sync|help}"
+      echo "Usage: $0 {sync|help}"
       exit 0
       ;;
-    ssh-add)
-      add_ssh_key
-      ;;
-    apply|sync)
+    sync)
       sync_all
       ;;
     *)
-      echo "Usage: $0 {ssh-add|sync|help}"
+      echo "Usage: $0 {sync|help}"
       exit 1
       ;;
   esac
