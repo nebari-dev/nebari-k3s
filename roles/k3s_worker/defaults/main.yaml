@@ -2,5 +2,3 @@ k3s_token: some-secret-password
 
 extra_agent_args: >-
   --flannel-iface=eth1
-  --data-dir /mnt/k3s-data
-
