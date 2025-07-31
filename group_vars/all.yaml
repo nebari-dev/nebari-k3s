@@ -23,6 +23,9 @@ extra_server_args: >-
   --write-kubeconfig-mode 644
   --flannel-iface={{ flannel_iface }}
 
+extra_agent_args: >-
+  --flannel-iface=eth1
+
 server_init_args: >-
   {% if groups['master'] | length > 1 %}
     {% if inventory_hostname == groups['master'][0] %}
