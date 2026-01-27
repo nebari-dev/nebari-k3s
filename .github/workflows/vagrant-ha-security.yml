@@ -33,13 +33,28 @@ jobs:
         run: |
           uname -a
           ruby -v || true
-          vagrant --version || true
+
+      - name: Install Vagrant (Ubuntu)
+        run: |
+            set -euxo pipefail
+            sudo apt-get update -y
+            sudo apt-get install -y wget gpg lsb-release ca-certificates
+
+            wget -O- https://apt.releases.hashicorp.com/gpg \
+            | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+
+            CODENAME="$(. /etc/os-release && echo "${VERSION_CODENAME}")"
+            echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com ${CODENAME} main" \
+            | sudo tee /etc/apt/sources.list.d/hashicorp.list
+
+            sudo apt-get update -y
+            sudo apt-get install -y vagrant
+            vagrant --version
 
       # -------- Linux: full run with libvirt  --------
       - name: Install virtualization deps (Linux)
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get update -y
           sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients virt-manager dnsmasq-base nmap
           sudo usermod -aG libvirt $USER || true
           sudo systemctl enable --now libvirtd
