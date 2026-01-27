@@ -1,13 +1,24 @@
 name: vagrant-ha-security
 
 on:
-  pull_request:
+  workflow_dispatch: {}
+
   push:
-    branches: [ main ]
-  workflow_dispatch:
+    branches-ignore:
+      - main
+
+  pull_request:
+    branches-ignore:
+      - main
+
+concurrency:
+  # One running workflow per branch/PR ref; new events cancel older in-progress runs
+  group: ${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
 
 jobs:
   vagrant-tests:
+    if: ${{ github.event_name != 'pull_request' || github.head_ref != 'main' }}
     strategy:
       fail-fast: false
       matrix:
