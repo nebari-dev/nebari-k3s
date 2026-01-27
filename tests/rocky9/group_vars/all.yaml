@@ -1,0 +1,24 @@
+# Vagrant private NIC is usually eth1
+flannel_iface: eth1
+
+# kube-vip will advertise this
+apiserver_endpoint: 192.168.56.10
+
+# used by firewall_secure.yaml to restrict internal traffic
+k3s_node_cidrs:
+  - 192.168.56.0/24
+
+# if you want API access from your host, add your host CIDR here.
+# otherwise leave [] and manage via vagrant ssh.
+k3s_admin_cidrs: []
+
+k3s_enable_metallb: true
+metal_lb_ip_range: "192.168.56.200-192.168.56.210"
+
+# optional tightening
+k3s_expose_ingress_publicly: false
+k3s_ingress_allowed_cidrs: []
+
+k3s_flannel_backend: "vxlan"
+k3s_enable_ipv6: false
+k3s_enable_kubelet_metrics: false
