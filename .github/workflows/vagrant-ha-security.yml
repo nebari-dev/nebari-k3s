@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest]
         platform: [rocky9, ubuntu]
     runs-on: ${{ matrix.os }}
 
@@ -35,7 +35,7 @@ jobs:
           ruby -v || true
           vagrant --version || true
 
-      # -------- Linux: full run with libvirt (preferred CI path) --------
+      # -------- Linux: full run with libvirt  --------
       - name: Install virtualization deps (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -51,15 +51,6 @@ jobs:
 
           vagrant plugin install vagrant-libvirt
 
-      # -------- macOS: validate-only by default (GitHub-hosted runners can lack HVF support) --------
-      # HVF unsupported reports on macOS ARM64 runners are common :contentReference[oaicite:8]{index=8}
-      - name: Install deps (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          brew update
-          brew install vagrant qemu nmap || true
-          vagrant plugin install vagrant-qemu || true
-
       - name: Platform env (prints what will be used)
         run: |
           bash tests/bin/env.sh
@@ -69,7 +60,6 @@ jobs:
           cd tests/${{ matrix.platform }}
           vagrant validate
 
-      # Full run on Linux
       - name: Bring up cluster + run Ansible + security scans (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -79,24 +69,6 @@ jobs:
           cd tests/${{ matrix.platform }}
 
           # For Rocky, add the correct box URL (from env.sh)
-          if [[ "${{ matrix.platform }}" == "rocky9" ]]; then
-            vagrant box add --name "${ROCKY_BOX_NAME}" "${ROCKY_BOX_URL}" --provider=libvirt || true
-          fi
-
-          vagrant up --provider="${PROVIDER}"
-
-          cd -
-          ansible-playbook -i tests/${{ matrix.platform }}/inventories/hosts.ini playbook.yaml
-          bash tests/bin/security-scan.sh tests/${{ matrix.platform }}/inventories/hosts.ini
-
-      # Optional full run on macOS only for self-hosted runners
-      - name: Bring up cluster + run Ansible + scans (macOS self-hosted only)
-        if: runner.os == 'macOS' && runner.name == 'self-hosted'
-        run: |
-          set -euxo pipefail
-          source tests/bin/env.sh
-
-          cd tests/${{ matrix.platform }}
           if [[ "${{ matrix.platform }}" == "rocky9" ]]; then
             vagrant box add --name "${ROCKY_BOX_NAME}" "${ROCKY_BOX_URL}" --provider=libvirt || true
           fi
