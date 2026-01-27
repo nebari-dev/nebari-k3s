@@ -1,5 +1,5 @@
+# /roles/k3s_master/tasks/k3s_server.yaml
 ---
-
 - name: Get IPv4 address of the flannel interface
   shell: >-
     ip -4 addr show {{ flannel_iface }} | grep -oP '(?<=inet\s)\d+(\.\d+){3}'
@@ -48,6 +48,8 @@
   args:
     chdir: /tmp
   register: k3s_server
+  environment:
+    INSTALL_K3S_VERSION: "{{ k3s_version }}"
 
 - name: Wait for k3s service to be running
   command: systemctl is-active k3s
@@ -87,36 +89,21 @@
     replace: '\1https://{{ apiserver_endpoint }}:6443'
     backup: yes
 
-- name: Wait for node-token
+- name: Wait for node-token (first master)
   ansible.builtin.wait_for:
     path: /var/lib/rancher/k3s/server/node-token
+  when: inventory_hostname == groups['master'][0]
 
-- name: Register node-token file access mode
-  ansible.builtin.stat:
-    path: /var/lib/rancher/k3s/server
-  register: p
-
-- name: Change file access node-token
-  ansible.builtin.file:
-    path: /var/lib/rancher/k3s/server
-    mode: g+rx,o+rx
-
-- name: Read node-token from master
+- name: Read node-token (first master) without changing perms
   ansible.builtin.slurp:
     src: /var/lib/rancher/k3s/server/node-token
   register: node_token
+  become: true
+  when: inventory_hostname == groups['master'][0]
+  no_log: true
 
-- name: Store Master node-token
+- name: Store cluster token fact for other tasks if needed
   ansible.builtin.set_fact:
     token: "{{ node_token.content | b64decode | regex_replace('\n', '') }}"
-    delegate_to: localhost
-  run_once: true
-
-# print current inventory_hostname and value of token | default(k3s_token)
-- debug:
-    msg: "{{ inventory_hostname }}: {{ hostvars[groups['master'][0]]['token'] | default(k3s_token) }}"
-
-- name: Restore node-token file access
-  ansible.builtin.file:
-    path: /var/lib/rancher/k3s/server
-    mode: "{{ p.stat.mode }}"
+  when: inventory_hostname == groups['master'][0]
+  no_log: true

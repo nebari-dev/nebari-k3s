@@ -1,3 +1,4 @@
+# /roles/k3s_worker/defaults/main.yaml
 k3s_token: some-secret-password
 
 extra_agent_args: >-

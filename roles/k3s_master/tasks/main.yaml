@@ -1,5 +1,5 @@
+# /roles/k3s_master/tasks/main.yaml
 ---
-
 - name: Deploy K3s
   ansible.builtin.include_tasks: k3s_server.yaml
 

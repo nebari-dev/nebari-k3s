@@ -1,3 +1,4 @@
+# /roles/k3s_worker/tasks/main.yaml
 ---
 - name: Download k3s install script
   ansible.builtin.get_url:
@@ -5,25 +6,18 @@
     dest: /tmp/install_k3s.sh
     mode: '0755'
 
+- name: Check if k3s is already installed
+  ansible.builtin.stat:
+    path: /usr/local/bin/k3s
+  register: k3s_installed
 
-# - name: Check if k3s is already installed
-#   ansible.builtin.stat:
-#     path: /usr/local/bin/k3s
-#   register: k3s_installed
-
-- name: Install k3s worker (only if not installed)
+- name: Install k3s agent (only if not installed)
   ansible.builtin.shell: |
     /tmp/install_k3s.sh agent \
       {{ extra_agent_args }} \
       --token={{ k3s_token }} \
       --server https://{{ apiserver_endpoint }}:6443
-
-# - name: Join other masters to the cluster
-#   command: /tmp/install_k3s.sh server --token {{ k3s_token }} --tls-san {{ apiserver_endpoint }} --disable servicelb --disable traefik --server https://{{ groups['master'][0] }}:6443
-#   args:
-#     chdir: /tmp
-#   register: k3s_server
-#   when: inventory_hostname != groups['master'][0]
-
-
-  # when: not k3s_installed.stat.exists
+  environment:
+    INSTALL_K3S_VERSION: "{{ k3s_version }}"
+  when: not k3s_installed.stat.exists
+  no_log: true  # avoids token leakage in logs

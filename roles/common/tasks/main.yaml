@@ -1,3 +1,4 @@
+# /roles/common/tasks/main.yaml
 ---
 # =====================================================================
 # Step 0: Disable Swap
@@ -18,6 +19,12 @@
     name: ufw
     state: present
   when : ansible_os_family == 'Debian'
+
+- name: Network prep (facts + validation)
+  ansible.builtin.include_tasks: network_prep.yaml
+
+- name: Secure firewall policy
+  ansible.builtin.include_tasks: firewall_secure.yam
 
 - name: Allow base ports (tcp)
   ufw:
@@ -206,11 +213,11 @@
 #   ansible.builtin.reboot:
 #   when: ansible_os_family == "RedHat"
 
-- name: Set containerd pull schema env var system-wide
+- name: Optionally enable deprecated containerd schema1 pulling
   ansible.builtin.lineinfile:
     path: /etc/environment
     regexp: '^CONTAINERD_ENABLE_DEPRECATED_PULL_SCHEMA_1_IMAGE='
     line: 'CONTAINERD_ENABLE_DEPRECATED_PULL_SCHEMA_1_IMAGE=1'
     create: yes
     state: present
-  when: ansible_os_family == "RedHat"
+  when: ansible_os_family == "RedHat" and (k3s_allow_deprecated_schema1_images | bool)
