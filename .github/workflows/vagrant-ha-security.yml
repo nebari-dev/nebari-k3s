@@ -54,10 +54,10 @@ jobs:
         run: |
           set -euxo pipefail
           sudo apt-get update -y
+          # Install libvirt and build deps for vagrant-libvirt native extensions
           sudo apt-get install -y \
             qemu-kvm libvirt-daemon-system libvirt-clients dnsmasq-base \
             nmap \
-            # needed to build vagrant-libvirt native extensions
             libvirt-dev pkg-config \
             ruby-dev gcc g++ make \
             libxml2-dev libxslt1-dev zlib1g-dev
