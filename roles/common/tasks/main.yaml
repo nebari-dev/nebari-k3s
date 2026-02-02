@@ -14,39 +14,11 @@
 #   when: ansible_swaptotal_mb > 0
 
 
-- name: Install UFW
-  ansible.builtin.package:
-    name: ufw
-    state: present
-  when : ansible_os_family == 'Debian'
-
 - name: Network prep (facts + validation)
   ansible.builtin.include_tasks: network_prep.yaml
 
 - name: Secure firewall policy
-  ansible.builtin.include_tasks: firewall_secure.yam
-
-- name: Allow base ports (tcp)
-  ufw:
-    rule: allow
-    port: "{{ item }}"
-    proto: tcp
-  with_items:
-    - 6443
-    - 443
-    - 7946 # Metallb
-  when : ansible_os_family == 'Debian'
-
-- name: Allow base ports (udp)
-  ufw:
-    rule: allow
-    port: "{{ item }}"
-    proto: udp
-  with_items:
-    - 6443
-    - 443
-    - 7946 # Metallb
-  when : ansible_os_family == 'Debian'
+  ansible.builtin.include_tasks: firewall_secure.yaml
 
 # https://infotechys.com/install-a-kubernetes-cluster-on-rhel-9/
 
@@ -126,92 +98,19 @@
 # =====================================================================
 
 # =====================================================================
-# Step 6: Set Firewall Rules for Kubernetes
+# Step 6: Firewall Rules are Now Managed by firewall_secure.yaml
 # =====================================================================
-- name: Open HTTP and HTTPS ports in Firewalld
-  ansible.posix.firewalld:
-    port: "{{ item }}/tcp"
-    permanent: yes
-    state: enabled
-    zone: public
-    immediate: yes
-  loop:
-    - 80
-    - 8443
-    - 8080
-    - 443
-    - 9990 # Keycloak management console
-    - 7946 # Metallb
-  when: ansible_os_family == "RedHat"
+# All firewall rules have been moved to roles/common/tasks/firewall_secure.yaml
+# This provides centralized, secure, zone-based firewall configuration
 
-- name: Open Kubernetes-related ports in Firewalld (TCP)
-  ansible.posix.firewalld:
-    port: "{{ item }}/tcp"
-    permanent: yes
-    state: enabled
-    zone: public
-    immediate: yes
-  loop:
-    - 6443
-    - 2379-2380
-    - 10250
-    - 10251
-    - 10252
-    - 10255
-    - 5473
-    - 7946 # Metallb
-  when: ansible_os_family == "RedHat"
-
-- name: Open Kubernetes-related ports in Firewalld (UDP)
-  ansible.posix.firewalld:
-    port: "{{ item }}/udp"
-    permanent: yes
-    state: enabled
-    zone: public
-    immediate: yes
-  loop:
-    - 8473
-    - 51820
-    - 51821
-    - 7946 # Metallb
-  when: ansible_os_family == "RedHat"
+# Remove these old overly-permissive rules:
+# - Open HTTP and HTTPS ports in Firewalld
+# - Open Kubernetes-related ports in Firewalld (TCP/UDP)
+# These are now properly restricted in firewall_secure.yaml
 
 # ---------------------------------------------------------------------
-# Add the two "trusted" sources for pods and services
+# Pod and Service subnets are now managed in firewall_secure.yaml
 # ---------------------------------------------------------------------
-# https://docs.k3s.io/installation/requirements#operating-systems
-
-- name: Allow pod subnet in the trusted zone
-  ansible.posix.firewalld:
-    source: 10.42.0.0/16
-    zone: trusted
-    state: enabled
-    permanent: yes
-    immediate: yes
-  when: ansible_os_family == "RedHat"
-
-- name: Allow service subnet in the trusted zone
-  ansible.posix.firewalld:
-    source: 10.43.0.0/16
-    zone: trusted
-    state: enabled
-    permanent: yes
-    immediate: yes
-  when: ansible_os_family == "RedHat"
-# ---------------------------------------------------------------------
-
-- name: Reload firewalld
-  ansible.posix.firewalld:
-    state: enabled
-    immediate: yes
-  when: ansible_os_family == "RedHat"
-
-# =====================================================================
-# (Optional) Reboot System
-# =====================================================================
-# - name: Reboot the machine (Optional)
-#   ansible.builtin.reboot:
-#   when: ansible_os_family == "RedHat"
 
 - name: Optionally enable deprecated containerd schema1 pulling
   ansible.builtin.lineinfile:

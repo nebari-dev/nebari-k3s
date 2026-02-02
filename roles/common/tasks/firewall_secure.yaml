@@ -1,4 +1,7 @@
 ---
+# =============================================================================
+# DEBIAN/UBUNTU UFW FIREWALL RULES
+# =============================================================================
 - name: Install UFW (Debian)
   ansible.builtin.package:
     name: ufw
@@ -12,12 +15,21 @@
     direction: incoming
   when: ansible_os_family == "Debian"
 
-- name: Allow SSH (adjust if needed)
+- name: Allow SSH only from admin CIDRs (Debian)
+  community.general.ufw:
+    rule: allow
+    from_ip: "{{ item }}"
+    port: "22"
+    proto: tcp
+  loop: "{{ k3s_admin_cidrs }}"
+  when: ansible_os_family == "Debian" and (k3s_admin_cidrs | length) > 0
+
+- name: Allow SSH from all (fallback if no admin CIDRs defined)
   community.general.ufw:
     rule: allow
     port: "22"
     proto: tcp
-  when: ansible_os_family == "Debian"
+  when: ansible_os_family == "Debian" and (k3s_admin_cidrs | length) == 0
 
 # --- K3s API: TCP only, and restricted ---
 - name: Allow API (6443/tcp) from node CIDRs
@@ -110,7 +122,9 @@
         and (k3s_expose_ingress_publicly | bool)
         and (k3s_ingress_allowed_cidrs | length > 0
 
----
+# =============================================================================
+# REDHAT/ROCKY/CENTOS FIREWALLD RULES
+# =============================================================================
 - name: Ensure firewalld is installed (RedHat)
   ansible.builtin.package:
     name: firewalld
@@ -124,17 +138,27 @@
     enabled: true
   when: ansible_os_family == "RedHat"
 
-- name: Create k3s-internal zone
+# -----------------------------------------------------------------------------
+# CREATE DEDICATED K3S-CLUSTER ZONE (Strict Node-to-Node)
+# -----------------------------------------------------------------------------
+- name: Create k3s-cluster zone for inter-node communication
   ansible.posix.firewalld:
-    zone: k3s-internal
+    zone: k3s-cluster
     state: present
     permanent: yes
     immediate: yes
   when: ansible_os_family == "RedHat"
 
-- name: Add node CIDRs as sources to k3s-internal
+- name: Set k3s-cluster zone target to DROP (default deny)
+  ansible.builtin.command: |
+    firewall-cmd --permanent --zone=k3s-cluster --set-target=DROP
+    firewall-cmd --reload
+  when: ansible_os_family == "RedHat"
+  changed_when: false
+
+- name: Add node CIDRs as sources to k3s-cluster zone
   ansible.posix.firewalld:
-    zone: k3s-internal
+    zone: k3s-cluster
     source: "{{ item }}"
     state: enabled
     permanent: yes
@@ -142,17 +166,29 @@
   loop: "{{ k3s_node_cidrs }}"
   when: ansible_os_family == "RedHat"
 
-# K3s API: allow node-to-node internally
-- name: Allow API 6443/tcp in k3s-internal
+- name: Add individual node IPs to k3s-cluster zone (from inventory)
   ansible.posix.firewalld:
-    zone: k3s-internal
+    zone: k3s-cluster
+    source: "{{ hostvars[item].ansible_host }}/32"
+    state: enabled
+    permanent: yes
+    immediate: yes
+  loop: "{{ groups['all'] }}"
+  when: ansible_os_family == "RedHat" and hostvars[item].ansible_host is defined
+
+# -----------------------------------------------------------------------------
+# K3S API SERVER (6443) - Node-to-Node + Admin Access
+# -----------------------------------------------------------------------------
+- name: Allow API 6443/tcp in k3s-cluster zone (node-to-node)
+  ansible.posix.firewalld:
+    zone: k3s-cluster
     port: 6443/tcp
     state: enabled
     permanent: yes
     immediate: yes
   when: ansible_os_family == "RedHat"
 
-# Allow admins to hit API (rich rules on public)
+# Allow admins to access API from specific CIDRs only
 - name: Allow admin CIDRs to access 6443/tcp (public zone rich rule)
   ansible.posix.firewalld:
     zone: public
@@ -163,10 +199,22 @@
   loop: "{{ k3s_admin_cidrs }}"
   when: ansible_os_family == "RedHat" and (k3s_admin_cidrs | length) > 0
 
-# MetalLB memberlist node-to-node only
-- name: Allow MetalLB memberlist 7946 tcp/udp internal
+# Block 6443 from public zone if not in admin CIDRs
+- name: Explicitly block 6443 in public zone (security hardening)
   ansible.posix.firewalld:
-    zone: k3s-internal
+    zone: public
+    rich_rule: 'rule family="ipv4" port port="6443" protocol="tcp" reject'
+    state: enabled
+    permanent: yes
+    immediate: yes
+  when: ansible_os_family == "RedHat"
+
+# -----------------------------------------------------------------------------
+# METALLB MEMBERLIST (7946) - Node-to-Node Only
+# -----------------------------------------------------------------------------
+- name: Allow MetalLB memberlist 7946 tcp/udp in k3s-cluster zone
+  ansible.posix.firewalld:
+    zone: k3s-cluster
     port: "{{ item }}"
     state: enabled
     permanent: yes
@@ -174,48 +222,72 @@
   loop: ["7946/tcp","7946/udp"]
   when: ansible_os_family == "RedHat" and (k3s_enable_metallb | bool)
 
-# Flannel backend
-- name: Allow flannel vxlan 8472/udp internal
+- name: Allow MetalLB speaker 7472/tcp in k3s-cluster zone
   ansible.posix.firewalld:
-    zone: k3s-internal
+    zone: k3s-cluster
+    port: 7472/tcp
+    state: enabled
+    permanent: yes
+    immediate: yes
+  when: ansible_os_family == "RedHat" and (k3s_enable_metallb | bool)
+
+# -----------------------------------------------------------------------------
+# FLANNEL CNI - Node-to-Node Only
+# -----------------------------------------------------------------------------
+- name: Allow flannel vxlan 8472/udp in k3s-cluster zone
+  ansible.posix.firewalld:
+    zone: k3s-cluster
     port: 8472/udp
     state: enabled
     permanent: yes
     immediate: yes
   when: ansible_os_family == "RedHat" and (k3s_flannel_backend == "vxlan")
 
-- name: Allow flannel wireguard 51820/udp internal
+- name: Allow flannel wireguard 51820/udp in k3s-cluster zone
   ansible.posix.firewalld:
-    zone: k3s-internal
+    zone: k3s-cluster
     port: 51820/udp
     state: enabled
     permanent: yes
     immediate: yes
   when: ansible_os_family == "RedHat" and (k3s_flannel_backend == "wireguard")
 
-- name: Allow flannel wireguard IPv6 51821/udp internal
+- name: Allow flannel wireguard IPv6 51821/udp in k3s-cluster zone
   ansible.posix.firewalld:
-    zone: k3s-internal
+    zone: k3s-cluster
     port: 51821/udp
     state: enabled
     permanent: yes
     immediate: yes
   when: ansible_os_family == "RedHat" and (k3s_flannel_backend == "wireguard") and (k3s_enable_ipv6 | bool)
 
-# kubelet metrics
-- name: Allow kubelet metrics 10250/tcp internal
+# -----------------------------------------------------------------------------
+# KUBELET METRICS (10250) - Node-to-Node Only
+# -----------------------------------------------------------------------------
+- name: Allow kubelet metrics 10250/tcp in k3s-cluster zone
   ansible.posix.firewalld:
-    zone: k3s-internal
+    zone: k3s-cluster
     port: 10250/tcp
     state: enabled
     permanent: yes
     immediate: yes
   when: ansible_os_family == "RedHat" and (k3s_enable_kubelet_metrics | bool)
 
-# etcd (masters only) internal only
-- name: Allow etcd 2379-2380/tcp internal (masters only)
+- name: Block kubelet metrics 10250 from public zone
   ansible.posix.firewalld:
-    zone: k3s-internal
+    zone: public
+    rich_rule: 'rule family="ipv4" port port="10250" protocol="tcp" reject'
+    state: enabled
+    permanent: yes
+    immediate: yes
+  when: ansible_os_family == "RedHat"
+
+# -----------------------------------------------------------------------------
+# ETCD (2379-2380) - Masters Only, Node-to-Node
+# -----------------------------------------------------------------------------
+- name: Allow etcd 2379-2380/tcp in k3s-cluster zone (masters only)
+  ansible.posix.firewalld:
+    zone: k3s-cluster
     port: 2379-2380/tcp
     state: enabled
     permanent: yes
@@ -224,8 +296,46 @@
         and (inventory_hostname in groups['master'])
         and (k3s_enable_embedded_etcd | bool)
 
-# Optional public ingress
-- name: Allow public ingress 80/443 if enabled
+- name: Block etcd ports from public zone
+  ansible.posix.firewalld:
+    zone: public
+    rich_rule: 'rule family="ipv4" port port="{{ item }}" protocol="tcp" reject'
+    state: enabled
+    permanent: yes
+    immediate: yes
+  loop: ["2379", "2380"]
+  when: ansible_os_family == "RedHat"
+
+# -----------------------------------------------------------------------------
+# NODEPORTS (30000-32767) - Restricted Access
+# -----------------------------------------------------------------------------
+# Block NodePorts from public zone by default
+- name: Block NodePort range 30000-32767 from public zone
+  ansible.posix.firewalld:
+    zone: public
+    rich_rule: 'rule family="ipv4" port port="30000-32767" protocol="tcp" reject'
+    state: enabled
+    permanent: yes
+    immediate: yes
+  when: ansible_os_family == "RedHat" and not (k3s_expose_nodeports_publicly | default(false) | bool)
+
+# Allow NodePorts only from admin CIDRs if needed
+- name: Allow NodePorts from admin CIDRs only
+  ansible.posix.firewalld:
+    zone: public
+    rich_rule: 'rule family="ipv4" source address="{{ item }}" port port="30000-32767" protocol="tcp" accept'
+    state: enabled
+    permanent: yes
+    immediate: yes
+  loop: "{{ k3s_admin_cidrs }}"
+  when: ansible_os_family == "RedHat" 
+        and (k3s_allow_nodeports_from_admin | default(true) | bool)
+        and (k3s_admin_cidrs | length) > 0
+
+# -----------------------------------------------------------------------------
+# INGRESS PORTS (80/443) - Controlled Public Access
+# -----------------------------------------------------------------------------
+- name: Allow public ingress 80/443 if enabled (unrestricted)
   ansible.posix.firewalld:
     zone: public
     port: "{{ item }}/tcp"
@@ -251,7 +361,57 @@
         and (k3s_expose_ingress_publicly | bool)
         and (k3s_ingress_allowed_cidrs | length > 0)
 
-# Keep these if you want (K3s docs recommend)
+- name: Block ingress 80/443 if not publicly exposed
+  ansible.posix.firewalld:
+    zone: public
+    rich_rule: 'rule family="ipv4" port port="{{ item }}" protocol="tcp" reject'
+    state: enabled
+    permanent: yes
+    immediate: yes
+  loop: ["80", "443"]
+  when: ansible_os_family == "RedHat" and not (k3s_expose_ingress_publicly | bool)
+
+# -----------------------------------------------------------------------------
+# BLOCK SENSITIVE PORTS FROM PUBLIC ZONE
+# -----------------------------------------------------------------------------
+- name: Block Kubernetes internal ports from public access
+  ansible.posix.firewalld:
+    zone: public
+    rich_rule: 'rule family="ipv4" port port="{{ item }}" protocol="tcp" reject'
+    state: enabled
+    permanent: yes
+    immediate: yes
+  loop:
+    - "10251"  # kube-scheduler
+    - "10252"  # kube-controller-manager
+    - "10255"  # kubelet read-only
+    - "10256"  # kube-proxy health
+    - "9099"   # calico-felix
+    - "5473"   # calico-typha
+    - "8080"   # insecure api (if accidentally enabled)
+    - "8443"   # alternative api
+  when: ansible_os_family == "RedHat"
+
+# Block common admin/debug ports
+- name: Block administrative and debug ports from public
+  ansible.posix.firewalld:
+    zone: public
+    rich_rule: 'rule family="ipv4" port port="{{ item }}" protocol="tcp" reject'
+    state: enabled
+    permanent: yes
+    immediate: yes
+  loop:
+    - "9990"   # Generic admin consoles
+    - "6444"   # K3s agent supervisor
+    - "10248"  # kubelet healthz
+    - "10249"  # kube-proxy metrics
+    - "10257"  # kube-controller-manager
+    - "10259"  # kube-scheduler
+  when: ansible_os_family == "RedHat"
+
+# -----------------------------------------------------------------------------
+# POD AND SERVICE SUBNETS IN TRUSTED ZONE
+# -----------------------------------------------------------------------------
 - name: Allow pod subnet in the trusted zone
   ansible.posix.firewalld:
     source: 10.42.0.0/16
@@ -268,4 +428,36 @@
     state: enabled
     permanent: yes
     immediate: yes
+  when: ansible_os_family == "RedHat"
+
+# -----------------------------------------------------------------------------
+# SSH ACCESS RESTRICTION
+# -----------------------------------------------------------------------------
+- name: Allow SSH only from admin CIDRs (RedHat)
+  ansible.posix.firewalld:
+    zone: public
+    rich_rule: 'rule family="ipv4" source address="{{ item }}" port port="22" protocol="tcp" accept'
+    state: enabled
+    permanent: yes
+    immediate: yes
+  loop: "{{ k3s_admin_cidrs }}"
+  when: ansible_os_family == "RedHat" and (k3s_admin_cidrs | length) > 0
+
+# Remove default SSH service from public zone if admin CIDRs are defined
+- name: Remove default SSH service from public zone
+  ansible.posix.firewalld:
+    zone: public
+    service: ssh
+    state: disabled
+    permanent: yes
+    immediate: yes
+  when: ansible_os_family == "RedHat" and (k3s_admin_cidrs | length) > 0
+
+# -----------------------------------------------------------------------------
+# APPLY ALL FIREWALL CHANGES
+# -----------------------------------------------------------------------------
+- name: Reload firewalld to apply all changes
+  ansible.builtin.systemd:
+    name: firewalld
+    state: reloaded
   when: ansible_os_family == "RedHat"

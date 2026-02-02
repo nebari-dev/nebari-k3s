@@ -53,14 +53,22 @@ metal_lb_ip_range: 192.168.10.191-192.168.10.199
 
 # --- Cluster network policy ---
 k3s_node_cidrs:
-  - 192.168.10.0/24        # node-to-node allowed
+  - 10.11.0.0/24           # Internal cluster network (eth1)
+  - 146.165.240.0/21       # External network (eth0) - adjust to match your needs
 
 k3s_admin_cidrs:
-  - 192.168.10.0/24        # adjust (VPN/bastion); can be empty but not recommended
+  - 10.11.0.0/24           # Internal admin access
+  - 146.165.243.211/32     # Specific admin host
+  - 146.165.243.212/32     # Specific admin host
+  # Add your bastion/VPN IPs here
 
 # Expose ingress to the world?
-k3s_expose_ingress_publicly: false
+k3s_expose_ingress_publicly: true
 k3s_ingress_allowed_cidrs: []  # if public=true, optionally restrict to these CIDRs
+
+# NodePort security settings
+k3s_expose_nodeports_publicly: false  # Block NodePorts from public by default
+k3s_allow_nodeports_from_admin: true  # Allow admin CIDRs to access NodePorts
 
 # Flannel backend: vxlan => 8472/udp, wireguard => 51820(/51821) udp
 k3s_flannel_backend: vxlan
