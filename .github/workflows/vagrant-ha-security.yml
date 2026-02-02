@@ -64,8 +64,12 @@ jobs:
 
           sudo systemctl enable --now libvirtd
 
-          # permissions (best effort; GH runner user is ephemeral)
-          sudo usermod -aG libvirt,kvm "$USER" || true
+          # Add user to groups
+          sudo usermod -aG libvirt,kvm "$USER"
+
+          # Fix socket permissions for CI environment
+          sudo chmod 666 /var/run/libvirt/libvirt-sock || true
+          sudo chmod 666 /var/run/libvirt/libvirt-sock-ro || true
 
       - name: Install Vagrant plugins
         run: |
@@ -98,19 +102,19 @@ jobs:
           set -euxo pipefail
           # Install jq for JSON parsing
           sudo apt-get install -y jq netcat-openbsd
-          
+
           # Install kube-bench for CIS Kubernetes Benchmark
           wget -q https://github.com/aquasecurity/kube-bench/releases/download/v0.7.1/kube-bench_0.7.1_linux_amd64.tar.gz
           tar -xzf kube-bench_0.7.1_linux_amd64.tar.gz
           sudo mv kube-bench /usr/local/bin/
           sudo chmod +x /usr/local/bin/kube-bench
-          
+
           # Install trivy for vulnerability scanning
           wget -q https://github.com/aquasecurity/trivy/releases/download/v0.48.0/trivy_0.48.0_Linux-64bit.tar.gz
           tar -xzf trivy_0.48.0_Linux-64bit.tar.gz
           sudo mv trivy /usr/local/bin/
           sudo chmod +x /usr/local/bin/trivy
-          
+
           # Verify installations
           kube-bench version || echo "kube-bench installed"
           trivy --version
@@ -129,7 +133,8 @@ jobs:
             vagrant box add --name "${ROCKY_BOX_NAME}" "${ROCKY_BOX_URL}" --provider=libvirt || true
           fi
 
-          vagrant up --provider="${PROVIDER}"
+          # Use sg to run with libvirt group active
+          sg libvirt -c "vagrant up --provider=${PROVIDER}"
 
           cd -  # repo root
 
@@ -143,14 +148,14 @@ jobs:
         run: |
           set -euxo pipefail
           cd tests/security-suite
-          
+
           # Run security tests in quick mode to avoid timeouts
           bash run-security-tests.sh \
             --inventory ../tests/${{ matrix.platform }}/inventories/hosts.ini \
             --output-dir ../../reports/${{ matrix.platform }} \
             --quick \
             --verbose || true
-          
+
           # Display summary
           if [[ -f ../../reports/${{ matrix.platform }}/security-report.json ]]; then
             echo "Security scan completed. Report generated:"
@@ -172,4 +177,4 @@ jobs:
         run: |
           set -euxo pipefail
           cd tests/${{ matrix.platform }}
-          vagrant destroy -f || true
+          sg libvirt -c "vagrant destroy -f" || true
