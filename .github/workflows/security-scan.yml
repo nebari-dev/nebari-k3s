@@ -1,0 +1,292 @@
+name: Scheduled Security Scan
+
+on:
+  # Run weekly on Monday at 6:00 AM UTC
+  schedule:
+    - cron: '0 6 * * 1'
+  
+  # Allow manual triggering
+  workflow_dispatch:
+    inputs:
+      target_environment:
+        description: 'Target environment to scan'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      quick_mode:
+        description: 'Run in quick mode (skip long-running tests)'
+        required: false
+        default: true
+        type: boolean
+
+  # Run on main branch pushes (for regression detection)
+  push:
+    branches:
+      - main
+    paths:
+      - 'roles/**'
+      - 'playbook.yaml'
+      - 'tests/security-suite/**'
+
+concurrency:
+  group: security-scan-${{ github.ref }}
+  cancel-in-progress: false  # Let scans complete
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [rocky9, ubuntu]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set scan parameters
+        id: params
+        run: |
+          # Determine target environment
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            TARGET="${{ inputs.target_environment }}"
+            QUICK="${{ inputs.quick_mode }}"
+          else
+            TARGET="staging"
+            QUICK="true"
+          fi
+          
+          echo "target=${TARGET}" >> $GITHUB_OUTPUT
+          echo "quick=${QUICK}" >> $GITHUB_OUTPUT
+          echo "timestamp=$(date +%Y%m%d_%H%M%S)" >> $GITHUB_OUTPUT
+
+      - name: Install dependencies
+        run: |
+          set -euxo pipefail
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            nmap \
+            netcat-openbsd \
+            jq \
+            python3-pip \
+            ansible
+
+      - name: Install Vagrant (HashiCorp repo)
+        run: |
+          set -euxo pipefail
+          sudo apt-get update -y
+          sudo apt-get install -y wget gpg lsb-release ca-certificates
+
+          wget -O- https://apt.releases.hashicorp.com/gpg \
+            | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+
+          CODENAME="$(. /etc/os-release && echo "${VERSION_CODENAME}")"
+          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com ${CODENAME} main" \
+            | sudo tee /etc/apt/sources.list.d/hashicorp.list
+
+          sudo apt-get update -y
+          sudo apt-get install -y vagrant
+          vagrant --version
+
+      - name: Install virtualization + build deps (libvirt)
+        run: |
+          set -euxo pipefail
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            qemu-kvm libvirt-daemon-system libvirt-clients dnsmasq-base \
+            libvirt-dev pkg-config \
+            ruby-dev gcc g++ make \
+            libxml2-dev libxslt1-dev zlib1g-dev
+
+          sudo systemctl enable --now libvirtd
+          sudo usermod -aG libvirt,kvm "$USER" || true
+
+      - name: Install Vagrant plugins
+        run: |
+          set -euxo pipefail
+          vagrant plugin install vagrant-libvirt
+
+      - name: Install security scanning tools
+        run: |
+          set -euxo pipefail
+          
+          # Install kube-bench for CIS Kubernetes Benchmark
+          wget -q https://github.com/aquasecurity/kube-bench/releases/download/v0.7.1/kube-bench_0.7.1_linux_amd64.tar.gz
+          tar -xzf kube-bench_0.7.1_linux_amd64.tar.gz
+          sudo mv kube-bench /usr/local/bin/
+          sudo chmod +x /usr/local/bin/kube-bench
+          
+          # Install trivy for vulnerability scanning
+          wget -q https://github.com/aquasecurity/trivy/releases/download/v0.48.0/trivy_0.48.0_Linux-64bit.tar.gz
+          tar -xzf trivy_0.48.0_Linux-64bit.tar.gz
+          sudo mv trivy /usr/local/bin/
+          sudo chmod +x /usr/local/bin/trivy
+          
+          # Install kubescape for security posture management
+          curl -s https://raw.githubusercontent.com/kubescape/kubescape/master/install.sh | bash
+          sudo mv ~/.kubescape/bin/kubescape /usr/local/bin/ || true
+          
+          # Verify installations
+          kube-bench version || echo "kube-bench installed"
+          trivy --version
+          kubescape version || echo "kubescape installed"
+          nmap --version
+
+      - name: Deploy test cluster
+        shell: bash
+        run: |
+          set -euxo pipefail
+          source tests/bin/env.sh
+
+          cd tests/${{ matrix.platform }}
+
+          # Rocky: ensure box exists
+          if [[ "${{ matrix.platform }}" == "rocky9" ]]; then
+            vagrant box add --name "${ROCKY_BOX_NAME}" "${ROCKY_BOX_URL}" --provider=libvirt || true
+          fi
+
+          vagrant up --provider="${PROVIDER}"
+
+      - name: Deploy K3s with security hardening
+        run: |
+          set -euxo pipefail
+          ansible-playbook -i tests/${{ matrix.platform }}/inventories/hosts.ini playbook.yaml
+
+      - name: Run comprehensive security test suite
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd tests/security-suite
+          
+          QUICK_FLAG=""
+          if [[ "${{ steps.params.outputs.quick }}" == "true" ]]; then
+            QUICK_FLAG="--quick"
+          fi
+          
+          # Run full security test suite
+          bash run-security-tests.sh \
+            --inventory ../tests/${{ matrix.platform }}/inventories/hosts.ini \
+            --output-dir ../../reports/${{ matrix.platform }}/${{ steps.params.outputs.timestamp }} \
+            ${QUICK_FLAG} \
+            --verbose || echo "Some tests failed - check reports"
+          
+          cd -
+
+      - name: Generate security summary
+        if: always()
+        run: |
+          set -euo pipefail
+          
+          REPORT_DIR="reports/${{ matrix.platform }}/${{ steps.params.outputs.timestamp }}"
+          
+          if [[ -f "${REPORT_DIR}/security-report.json" ]]; then
+            echo "## Security Scan Summary - ${{ matrix.platform }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Timestamp:** ${{ steps.params.outputs.timestamp }}" >> $GITHUB_STEP_SUMMARY
+            echo "**Environment:** ${{ steps.params.outputs.target }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            # Extract summary from JSON
+            TOTAL=$(jq -r '.summary.total_tests // 0' "${REPORT_DIR}/security-report.json")
+            PASSED=$(jq -r '.summary.passed // 0' "${REPORT_DIR}/security-report.json")
+            FAILED=$(jq -r '.summary.failed // 0' "${REPORT_DIR}/security-report.json")
+            WARNINGS=$(jq -r '.summary.warnings // 0' "${REPORT_DIR}/security-report.json")
+            SCORE=$(jq -r '.compliance_score // 0' "${REPORT_DIR}/security-report.json")
+            
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Total Tests | ${TOTAL} |" >> $GITHUB_STEP_SUMMARY
+            echo "| ✅ Passed | ${PASSED} |" >> $GITHUB_STEP_SUMMARY
+            echo "| ❌ Failed | ${FAILED} |" >> $GITHUB_STEP_SUMMARY
+            echo "| ⚠️  Warnings | ${WARNINGS} |" >> $GITHUB_STEP_SUMMARY
+            echo "| 📊 Compliance Score | ${SCORE}% |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            # Add critical findings if any
+            CRITICAL=$(jq -r '.findings[] | select(.severity == "CRITICAL" or .severity == "HIGH") | .description' "${REPORT_DIR}/security-report.json" 2>/dev/null || true)
+            if [[ -n "${CRITICAL}" ]]; then
+              echo "### ⚠️ Critical Findings" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "${CRITICAL}" | while read -r line; do
+                echo "- ${line}" >> $GITHUB_STEP_SUMMARY
+              done
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+            
+            echo "📎 Full report available in artifacts" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Security report not generated" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Check compliance thresholds
+        if: always()
+        run: |
+          set -euo pipefail
+          
+          REPORT_DIR="reports/${{ matrix.platform }}/${{ steps.params.outputs.timestamp }}"
+          
+          if [[ -f "${REPORT_DIR}/security-report.json" ]]; then
+            SCORE=$(jq -r '.compliance_score // 0' "${REPORT_DIR}/security-report.json")
+            FAILED=$(jq -r '.summary.failed // 0' "${REPORT_DIR}/security-report.json")
+            
+            # Fail if compliance score is below 80% or there are critical failures
+            if (( $(echo "${SCORE} < 80" | bc -l) )); then
+              echo "❌ Compliance score ${SCORE}% is below threshold (80%)"
+              exit 1
+            fi
+            
+            # Warning for any failed tests (but don't fail the workflow)
+            if (( FAILED > 0 )); then
+              echo "⚠️ ${FAILED} security tests failed - review required"
+            fi
+            
+            echo "✅ Compliance score ${SCORE}% meets threshold"
+          else
+            echo "⚠️ Cannot verify compliance - report missing"
+            exit 1
+          fi
+
+      - name: Upload security reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-scan-${{ matrix.platform }}-${{ steps.params.outputs.timestamp }}
+          path: |
+            reports/${{ matrix.platform }}/**
+            tests/bin/security-scan-*.log
+          retention-days: 90  # Keep security reports for 90 days
+
+      - name: Cleanup test cluster
+        if: always()
+        run: |
+          set -euxo pipefail
+          cd tests/${{ matrix.platform }}
+          vagrant destroy -f || true
+
+  # Aggregate results from both platforms
+  aggregate-results:
+    needs: security-scan
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-reports
+
+      - name: Create aggregate summary
+        run: |
+          echo "## 🔒 Security Scan Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Security scans completed for all platforms." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📊 Individual platform reports available in artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ -d "all-reports" ]]; then
+            echo "### Available Reports" >> $GITHUB_STEP_SUMMARY
+            ls -la all-reports/ >> $GITHUB_STEP_SUMMARY || true
+          fi

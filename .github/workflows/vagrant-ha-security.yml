@@ -93,6 +93,29 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y ansible
 
+      - name: Install security scanning tools
+        run: |
+          set -euxo pipefail
+          # Install jq for JSON parsing
+          sudo apt-get install -y jq netcat-openbsd
+          
+          # Install kube-bench for CIS Kubernetes Benchmark
+          wget -q https://github.com/aquasecurity/kube-bench/releases/download/v0.7.1/kube-bench_0.7.1_linux_amd64.tar.gz
+          tar -xzf kube-bench_0.7.1_linux_amd64.tar.gz
+          sudo mv kube-bench /usr/local/bin/
+          sudo chmod +x /usr/local/bin/kube-bench
+          
+          # Install trivy for vulnerability scanning
+          wget -q https://github.com/aquasecurity/trivy/releases/download/v0.48.0/trivy_0.48.0_Linux-64bit.tar.gz
+          tar -xzf trivy_0.48.0_Linux-64bit.tar.gz
+          sudo mv trivy /usr/local/bin/
+          sudo chmod +x /usr/local/bin/trivy
+          
+          # Verify installations
+          kube-bench version || echo "kube-bench installed"
+          trivy --version
+          nmap --version
+
       - name: Bring up cluster + run Ansible + security scans
         shell: bash
         run: |
@@ -113,6 +136,36 @@ jobs:
           ansible-playbook -i tests/${{ matrix.platform }}/inventories/hosts.ini playbook.yaml
 
           bash tests/bin/security-scan.sh tests/${{ matrix.platform }}/inventories/hosts.ini
+
+      - name: Run comprehensive security test suite
+        if: always()
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd tests/security-suite
+          
+          # Run security tests in quick mode to avoid timeouts
+          bash run-security-tests.sh \
+            --inventory ../tests/${{ matrix.platform }}/inventories/hosts.ini \
+            --output-dir ../../reports/${{ matrix.platform }} \
+            --quick \
+            --verbose || true
+          
+          # Display summary
+          if [[ -f ../../reports/${{ matrix.platform }}/security-report.json ]]; then
+            echo "Security scan completed. Report generated:"
+            jq -r '.summary' ../../reports/${{ matrix.platform }}/security-report.json || true
+          fi
+
+      - name: Upload security reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports-${{ matrix.platform }}-${{ github.run_number }}
+          path: |
+            reports/${{ matrix.platform }}/**
+            tests/bin/security-scan-*.log
+          retention-days: 30
 
       - name: Cleanup VMs (always)
         if: always()
