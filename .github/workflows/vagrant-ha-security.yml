@@ -70,17 +70,17 @@ jobs:
           # Fix socket permissions for CI environment
           sudo chmod 666 /var/run/libvirt/libvirt-sock || true
           sudo chmod 666 /var/run/libvirt/libvirt-sock-ro || true
-          
+
           # Enable nested virtualization
           sudo modprobe kvm_intel nested=1 || true
           sudo modprobe kvm_amd nested=1 || true
-          
+
           # Ensure default libvirt network is running
           sudo virsh net-list --all
           sudo virsh net-start default || true
           sudo virsh net-autostart default
           sudo virsh net-list --all
-          
+
           # Verify QEMU can run
           which qemu-system-x86_64
           qemu-system-x86_64 --version
