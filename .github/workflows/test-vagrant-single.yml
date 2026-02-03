@@ -1,0 +1,202 @@
+name: Test Vagrant Single Instance
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - '.github/workflows/test-vagrant-single.yml'
+
+jobs:
+  test-single-vm:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show system info
+        run: |
+          set -x
+          uname -a
+          cat /proc/cpuinfo | grep -E "^model name" | head -1
+          cat /proc/cpuinfo | grep -E "^flags" | grep -o "vmx\|svm" || echo "No hardware virtualization"
+          free -h
+          df -h
+
+      - name: Install Vagrant
+        run: |
+          set -euxo pipefail
+          wget -O- https://apt.releases.hashicorp.com/gpg \
+            | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+
+          CODENAME="$(. /etc/os-release && echo "${VERSION_CODENAME}")"
+          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com ${CODENAME} main" \
+            | sudo tee /etc/apt/sources.list.d/hashicorp.list
+
+          sudo apt-get update -y
+          sudo apt-get install -y vagrant
+          vagrant --version
+
+      - name: Install libvirt
+        run: |
+          set -euxo pipefail
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            qemu-kvm \
+            libvirt-daemon-system \
+            libvirt-clients \
+            libvirt-dev \
+            dnsmasq-base \
+            bridge-utils \
+            pkg-config \
+            ruby-dev \
+            gcc \
+            g++ \
+            make
+
+          echo "Installed packages:"
+          dpkg -l | grep -E "libvirt|qemu" | awk '{print $2, $3}'
+
+      - name: Start and configure libvirt
+        run: |
+          set -euxo pipefail
+          
+          # Start libvirt
+          sudo systemctl start libvirtd
+          sudo systemctl status libvirtd --no-pager
+          
+          # Check libvirt version
+          virsh version
+          
+          # Add user to groups
+          sudo usermod -aG libvirt,kvm "$USER"
+          
+          # Fix socket permissions
+          sudo chmod 666 /var/run/libvirt/libvirt-sock
+          sudo chmod 666 /var/run/libvirt/libvirt-sock-ro
+          
+          # Check connection
+          virsh -c qemu:///system capabilities | head -20
+          
+          # List all networks
+          echo "=== Networks before start ==="
+          sudo virsh net-list --all
+          
+          # Start default network
+          sudo virsh net-start default || echo "Network might already be running"
+          sudo virsh net-autostart default
+          
+          echo "=== Networks after start ==="
+          sudo virsh net-list --all
+          
+          # Show network details
+          echo "=== Default network config ==="
+          sudo virsh net-dumpxml default
+          
+          # Check dnsmasq
+          echo "=== dnsmasq processes ==="
+          ps aux | grep dnsmasq || echo "No dnsmasq running"
+          
+          # Check bridge
+          echo "=== Bridges ==="
+          brctl show || ip link show type bridge
+
+      - name: Install vagrant-libvirt plugin
+        run: |
+          set -euxo pipefail
+          vagrant plugin install vagrant-libvirt
+          vagrant plugin list
+
+      - name: Create test Vagrantfile
+        run: |
+          cat > /tmp/test-vagrant/Vagrantfile << 'EOF'
+          Vagrant.configure("2") do |config|
+            config.vm.box = "generic/rocky9"
+            config.vm.hostname = "test-vm"
+            
+            config.vm.provider "libvirt" do |lv|
+              lv.cpus = 1
+              lv.memory = 2048
+              lv.driver = "kvm"
+            end
+            
+            config.vm.network "private_network", 
+              type: "dhcp",
+              libvirt__network_name: "vagrant-test"
+          end
+          EOF
+          
+          mkdir -p /tmp/test-vagrant
+          cat /tmp/test-vagrant/Vagrantfile
+
+      - name: Validate Vagrantfile
+        working-directory: /tmp/test-vagrant
+        run: |
+          vagrant validate
+
+      - name: Test vagrant up with debug
+        working-directory: /tmp/test-vagrant
+        run: |
+          set -euxo pipefail
+          
+          # Use sg to activate libvirt group
+          sg libvirt -c "vagrant up --provider=libvirt --debug" 2>&1 | tee vagrant-debug.log || {
+            echo "=== Vagrant failed ==="
+            echo "=== Vagrant status ==="
+            sg libvirt -c "vagrant status" || true
+            
+            echo "=== Libvirt VMs ==="
+            sudo virsh list --all
+            
+            echo "=== Libvirt networks ==="
+            sudo virsh net-list --all
+            
+            echo "=== Last 100 lines of debug log ==="
+            tail -100 vagrant-debug.log
+            
+            echo "=== System logs ==="
+            sudo journalctl -u libvirtd --no-pager -n 50
+            
+            exit 1
+          }
+
+      - name: Check VM status
+        if: always()
+        working-directory: /tmp/test-vagrant
+        run: |
+          echo "=== Vagrant status ==="
+          sg libvirt -c "vagrant status" || true
+          
+          echo "=== Libvirt VMs ==="
+          sudo virsh list --all
+          
+          echo "=== VM details ==="
+          for vm in $(sudo virsh list --all --name); do
+            if [[ -n "$vm" ]]; then
+              echo "=== VM: $vm ==="
+              sudo virsh dominfo "$vm" || true
+            fi
+          done
+
+      - name: Test SSH connection
+        if: success()
+        working-directory: /tmp/test-vagrant
+        run: |
+          sg libvirt -c "vagrant ssh -c 'echo Successfully connected to VM && hostname && ip addr'"
+
+      - name: Upload debug logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vagrant-debug-logs
+          path: |
+            /tmp/test-vagrant/vagrant-debug.log
+            /tmp/test-vagrant/.vagrant/
+          retention-days: 7
+
+      - name: Cleanup
+        if: always()
+        working-directory: /tmp/test-vagrant
+        run: |
+          sg libvirt -c "vagrant destroy -f" || true
+          sudo virsh net-destroy vagrant-test || true
+          sudo virsh net-undefine vagrant-test || true
