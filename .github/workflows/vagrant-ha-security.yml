@@ -70,6 +70,20 @@ jobs:
           # Fix socket permissions for CI environment
           sudo chmod 666 /var/run/libvirt/libvirt-sock || true
           sudo chmod 666 /var/run/libvirt/libvirt-sock-ro || true
+          
+          # Enable nested virtualization
+          sudo modprobe kvm_intel nested=1 || true
+          sudo modprobe kvm_amd nested=1 || true
+          
+          # Ensure default libvirt network is running
+          sudo virsh net-list --all
+          sudo virsh net-start default || true
+          sudo virsh net-autostart default
+          sudo virsh net-list --all
+          
+          # Verify QEMU can run
+          which qemu-system-x86_64
+          qemu-system-x86_64 --version
 
       - name: Install Vagrant plugins
         run: |
@@ -133,8 +147,14 @@ jobs:
             vagrant box add --name "${ROCKY_BOX_NAME}" "${ROCKY_BOX_URL}" --provider=libvirt || true
           fi
 
-          # Use sg to run with libvirt group active
-          sg libvirt -c "vagrant up --provider=${PROVIDER}"
+          # Set timeout for DHCP and use sg to run with libvirt group active
+          export VAGRANT_DEFAULT_PROVIDER=libvirt
+          sg libvirt -c "vagrant up --provider=${PROVIDER}" 2>&1 | tee vagrant-up.log || {
+            echo "Vagrant up failed, showing VM status:"
+            sg libvirt -c "vagrant status" || true
+            sg libvirt -c "virsh list --all" || true
+            exit 1
+          }
 
           cd -  # repo root
 
