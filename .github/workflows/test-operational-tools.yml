@@ -132,6 +132,7 @@ jobs:
           vagrant plugin install vagrant-libvirt
       
       - name: Start test VMs
+        timeout-minutes: 20  # Fail fast if VMs don't start
         run: |
           cd tests/vagrant
           

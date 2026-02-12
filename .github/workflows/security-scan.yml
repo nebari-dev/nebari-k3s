@@ -156,6 +156,7 @@ jobs:
           nmap --version
 
       - name: Deploy test cluster
+        timeout-minutes: 20  # Fail fast if VMs don't start
         shell: bash
         run: |
           set -euxo pipefail

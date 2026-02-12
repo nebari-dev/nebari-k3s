@@ -8,7 +8,7 @@ ARCH="$(uname -m)"
 export NET="${NET:-192.168.56}"
 export VIP="${VIP:-${NET}.10}"
 export CPUS="${CPUS:-2}"
-export MEM="${MEM:-4096}"
+export MEM="${MEM:-2048}"  # Reduced for CI stability
 
 # Provider choice:
 # - macOS: vagrant-qemu (QEMU native on Apple Silicon; no KVM) :contentReference[oaicite:2]{index=2}

@@ -135,6 +135,7 @@ jobs:
           nmap --version
 
       - name: Bring up cluster + run Ansible + security scans
+        timeout-minutes: 20  # Fail fast if VMs don't start
         shell: bash
         run: |
           set -euxo pipefail
