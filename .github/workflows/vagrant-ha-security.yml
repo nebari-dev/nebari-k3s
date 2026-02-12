@@ -153,9 +153,8 @@ jobs:
           sg libvirt -c "virsh net-info default" || true
 
           # Set timeout and use sg to run with libvirt group active
-          # Use --no-parallel to avoid network configuration race conditions
           export VAGRANT_DEFAULT_PROVIDER=libvirt
-          sg libvirt -c "vagrant up --no-parallel --provider=${PROVIDER}" 2>&1 | tee vagrant-up.log || {
+          sg libvirt -c "vagrant up --provider=${PROVIDER}" 2>&1 | tee vagrant-up.log || {
             echo "Vagrant up failed, showing VM status:"
             sg libvirt -c "vagrant status" || true
             sg libvirt -c "virsh list --all" || true

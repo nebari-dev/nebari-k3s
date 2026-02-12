@@ -139,8 +139,8 @@ jobs:
           sg libvirt -c "virsh net-list --all" || true
           sg libvirt -c "virsh net-start default" || true
           
-          # Start VMs sequentially to avoid network race conditions
-          sg libvirt -c "vagrant up --no-parallel --provider=libvirt"
+          # Start VMs (3 VMs can start in parallel without resource issues)
+          sg libvirt -c "vagrant up --provider=libvirt"
       
       - name: Run connectivity check
         run: |
