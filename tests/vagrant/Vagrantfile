@@ -3,11 +3,11 @@ Vagrant.configure("2") do |config|
   config.vm.box_url = ENV["ROCKY_BOX_URL"] # optional but recommended
   config.ssh.insert_key = false
 
-  # Increase boot timeout for QEMU on macOS
-  config.vm.boot_timeout = 600
+  # Increase boot timeout for slow CI environments
+  config.vm.boot_timeout = 900  # 15 minutes for CI
 
   # SSH configuration for better reliability
-  config.ssh.connect_timeout = 30
+  config.ssh.connect_timeout = 60  # Increased for CI
   config.ssh.forward_agent = false
   config.ssh.forward_x11 = false
 
@@ -30,11 +30,14 @@ Vagrant.configure("2") do |config|
       vm.vm.hostname = n[:name]
       vm.vm.synced_folder ".", "/vagrant", disabled: true
 
-      # Linux/libvirt can do static private_network easily
+      # Network configuration (libvirt supports private_network)
+      vm.vm.network "private_network", ip: n[:ip]
+
+      # Linux/libvirt provider
       vm.vm.provider "libvirt" do |lv|
-        vm.vm.network "private_network", ip: n[:ip]
         lv.cpus = CPUS
         lv.memory = MEM
+        lv.default_prefix = "vagrant_"  # Explicit prefix
       end
 
       # macOS/qemu: still set resources; networking handled in bootstrap (set IP inside guest)
