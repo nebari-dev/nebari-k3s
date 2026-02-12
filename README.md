@@ -14,7 +14,29 @@ This playbook implements comprehensive security hardening for K3s clusters:
 - **Zone-based isolation** - separation between cluster, trusted, and public networks
 - **Optional ingress restrictions** - control external access to services
 
+## �️ Operational Features
+
+Safe and predictable cluster management tools:
+
+- **🔍 Dry-Run Mode** - Preview exactly what will change before applying (like Terraform plan)
+- **🔌 Connectivity Check** - Validate SSH access and basic commands work on all nodes
+- **🔄 Idempotent Operations** - Safe to re-run playbook multiple times without breaking etcd
+- **📊 Detailed Diffs** - See file changes, package updates, and service modifications
+- **🎯 Selective Execution** - Update specific nodes or components with tags/limits
+
+See [Operational Guide](docs/operational-guide.md) for detailed usage.
+
 ## 📋 Quick Start
+
+### 0. Pre-flight Checks (Recommended)
+
+```bash
+# Validate connectivity to all nodes
+ansible-playbook -i hosts.ini connectivity-check.yaml
+
+# Preview what will change (dry-run)
+./scripts/dry-run.sh -i hosts.ini
+```
 
 ### 1. Configure Your Network
 
@@ -79,7 +101,52 @@ nc -zv <node-ip> 30000  # NodePort
 - **[Configuration Variables](docs/configuration-variables.md)** - Complete variable reference with examples
 - **[Storage Options](docs/storage-options.md)** - Storage backends (local-path, Longhorn, NFS, Ceph)
 - **[Network Configuration](docs/network-configuration.md)** - CNI, Flannel backends, service networking
+- **[Operational Guide](docs/operational-guide.md)** - Dry-run, connectivity checks, idempotency
 - **[Documentation Index](docs/README.md)** - Browse all documentation
+
+## 🔄 Recommended Workflow
+
+### New Deployment
+```bash
+# 1. Test connectivity to all nodes
+ansible-playbook -i inventory/production.ini connectivity-check.yaml
+
+# 2. Preview changes (dry-run)
+./scripts/dry-run.sh -i inventory/production.ini -o /tmp/deployment-plan.log
+
+# 3. Review the plan
+less /tmp/deployment-plan.log
+
+# 4. Deploy cluster (safe - idempotent)
+ansible-playbook -i inventory/production.ini playbook.yaml
+```
+
+### Updates & Maintenance
+```bash
+# 1. Check connectivity to ensure all nodes accessible
+ansible-playbook -i inventory/production.ini connectivity-check.yaml
+
+# 2. See what would change
+./scripts/dry-run.sh -i inventory/production.ini -v
+
+# 3. Apply changes (safe to re-run)
+ansible-playbook -i inventory/production.ini playbook.yaml
+
+# 4. Verify security
+./scripts/validate-security.sh
+```
+
+### Troubleshooting
+```bash
+# Check specific node
+ansible-playbook -i inventory/hosts.ini connectivity-check.yaml -l problem-node -e connectivity_check_verbose=true
+
+# Preview changes for one node
+./scripts/dry-run.sh -i inventory/hosts.ini -l problem-node
+
+# Re-apply configuration (idempotent)
+ansible-playbook -i inventory/hosts.ini playbook.yaml -l problem-node
+```
 
 ## 🛡️ Security Architecture
 

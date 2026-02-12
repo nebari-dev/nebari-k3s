@@ -17,39 +17,57 @@
     master_ip: "{{ master_ip.stdout }}"
   when: master_ip is defined
 
-# Check if we can retrieve ansible_facts.all_ipv4_addresses from the master node and
-# store it in master_ip using the first IP address
+# ============================================
+# IDEMPOTENCY: Check if k3s is already installed and running
+# ============================================
+- name: Check if k3s binary exists
+  ansible.builtin.stat:
+    path: /usr/local/bin/k3s
+  register: k3s_binary
+
+- name: Check if k3s service exists
+  ansible.builtin.systemd:
+    name: k3s
+  register: k3s_service
+  failed_when: false
+  when: k3s_binary.stat.exists
+
+- name: Check k3s version if installed
+  ansible.builtin.command: /usr/local/bin/k3s --version
+  register: k3s_current_version
+  changed_when: false
+  failed_when: false
+  when: k3s_binary.stat.exists
+
+- name: Display current k3s status
+  ansible.builtin.debug:
+    msg: |
+      k3s installed: {{ k3s_binary.stat.exists }}
+      {% if k3s_binary.stat.exists %}
+      Current version: {{ k3s_current_version.stdout_lines[0] | default('unknown') }}
+      Service active: {{ k3s_service.status.ActiveState | default('unknown') }}
+      {% endif %}
+      Target version: {{ k3s_version }}
+  when: k3s_binary.stat.exists
+
+# Download install script (always, it's a small script)
 - name: Download k3s installation script
-  get_url:
+  ansible.builtin.get_url:
     url: https://get.k3s.io
     dest: /tmp/install_k3s.sh
     mode: "u=rwx,g=rx,o=rx"
 
-# show hostvars contents of groups['master'][0]
-# - debug:
-#     msg: "{{ hostvars[groups['master'][0]] }}"
-#   when: inventory_hostname != groups['master'][0]
-
-# - name: Get IPv4 address of the flannel interface
-#   set_fact:
-#     master_ip: "{{ hostvars[groups['master'][0]].ansible_facts.all_ipv4_addresses[0] }}"
-#   delegate_to: "{{ groups['master'][0] }}"
-#   run_once: true
-#   when: inventory_hostname == groups['master'][0]
-
-# - name: Debug master IP
-#   debug:
-#     msg: "{{ master_ip }}"
-#   when: master_ip is defined
-
-
-- name: Install k3s server (init-cluster)
-  command: /tmp/install_k3s.sh server {{ server_init_args }}
+# Only install/upgrade if needed
+- name: Install or upgrade k3s server
+  ansible.builtin.command: /tmp/install_k3s.sh server {{ server_init_args }}
   args:
     chdir: /tmp
   register: k3s_server
   environment:
     INSTALL_K3S_VERSION: "{{ k3s_version }}"
+  when: >
+    not k3s_binary.stat.exists or
+    (k3s_current_version.stdout is defined and k3s_version not in k3s_current_version.stdout)
 
 - name: Wait for k3s service to be running
   command: systemctl is-active k3s

@@ -21,8 +21,10 @@ Single cluster on a private network:
 ## Requirements
 
 - Vagrant
-- VirtualBox
+- VirtualBox or QEMU (macOS)
 - Ansible (run from repo root)
+
+The default box is `generic/rocky9` which supports multiple providers.
 
 ## Bring up / destroy
 

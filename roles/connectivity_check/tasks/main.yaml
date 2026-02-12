@@ -1,0 +1,149 @@
+---
+# /roles/connectivity_check/tasks/main.yaml
+# Simple connectivity and system access validation
+
+- name: Display connectivity check header
+  ansible.builtin.debug:
+    msg: "╔══════════════════════════════════════════════╗
+          ║  CONNECTIVITY CHECK: {{ inventory_hostname }}
+          ╚══════════════════════════════════════════════╝"
+
+# ============================================
+# Basic System Information
+# ============================================
+- name: Gather minimal facts
+  ansible.builtin.setup:
+    gather_subset:
+      - '!all'
+      - '!min'
+      - network
+      - hardware
+  ignore_errors: yes
+
+- name: Run basic system commands
+  ansible.builtin.command: "{{ item.cmd }}"
+  loop: "{{ connectivity_check_commands }}"
+  register: command_results
+  changed_when: false
+  failed_when: false
+
+- name: Display system information
+  ansible.builtin.debug:
+    msg: |
+      ═══════════════════════════════════════════════
+      {{ item.item.name }}:
+      ───────────────────────────────────────────────
+      {{ item.stdout }}
+      {% if item.stderr %}
+      ERROR: {{ item.stderr }}
+      {% endif %}
+  loop: "{{ command_results.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: connectivity_check_verbose or item.rc != 0
+
+# ============================================
+# SSH Access Validation
+# ============================================
+- name: Test sudo access
+  ansible.builtin.command: sudo -n true
+  changed_when: false
+  register: sudo_check
+  failed_when: false
+
+- name: Display sudo access status
+  ansible.builtin.debug:
+    msg: |
+      ✓ Sudo access: {{ 'WORKING' if sudo_check.rc == 0 else 'FAILED' }}
+  when: sudo_check.rc == 0
+
+- name: Warn if sudo access fails
+  ansible.builtin.fail:
+    msg: |
+      ✗ Sudo access FAILED on {{ inventory_hostname }}
+      This may cause issues with privileged operations.
+  when: sudo_check.rc != 0
+
+# ============================================
+# Network Connectivity Tests
+# ============================================
+- name: Test connectivity to other cluster nodes
+  ansible.builtin.wait_for:
+    host: "{{ hostvars[item].ansible_host | default(item) }}"
+    port: 22
+    timeout: 5
+    state: started
+  loop: "{{ groups['k3s_cluster'] | default([]) }}"
+  when:
+    - item != inventory_hostname
+    - groups['k3s_cluster'] is defined
+  register: node_connectivity
+  failed_when: false
+  changed_when: false
+
+- name: Display node connectivity results
+  ansible.builtin.debug:
+    msg: |
+      ✓ Network connectivity to {{ item.item }}: {{ 'OK' if item.failed == false else 'FAILED' }}
+  loop: "{{ node_connectivity.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when:
+    - node_connectivity.results is defined
+    - item.item != inventory_hostname
+
+# ============================================
+# Python Validation (for Ansible)
+# ============================================
+- name: Check Python availability
+  ansible.builtin.command: python3 --version
+  changed_when: false
+  register: python_check
+  failed_when: false
+
+- name: Display Python status
+  ansible.builtin.debug:
+    msg: |
+      ✓ Python: {{ python_check.stdout if python_check.rc == 0 else 'NOT FOUND' }}
+
+# ============================================
+# Critical Services Check (if exists)
+# ============================================
+- name: Check if systemd is available
+  ansible.builtin.command: systemctl --version
+  changed_when: false
+  register: systemd_check
+  failed_when: false
+
+- name: Check critical services status
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+  loop:
+    - sshd
+    - firewalld
+  register: service_status
+  failed_when: false
+  when: systemd_check.rc == 0
+
+- name: Display service status
+  ansible.builtin.debug:
+    msg: |
+      Service {{ item.item }}: {{ item.status.ActiveState | default('unknown') }}
+  loop: "{{ service_status.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when:
+    - service_status.results is defined
+    - item.status is defined
+
+# ============================================
+# Final Summary
+# ============================================
+- name: Connectivity check summary
+  ansible.builtin.debug:
+    msg: |
+      ╔══════════════════════════════════════════════╗
+      ║  CONNECTIVITY CHECK COMPLETED
+      ║  Host: {{ inventory_hostname }}
+      ║  Status: {{ 'PASSED' if sudo_check.rc == 0 and python_check.rc == 0 else 'ISSUES DETECTED' }}
+      ╚══════════════════════════════════════════════╝
