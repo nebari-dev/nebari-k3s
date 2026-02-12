@@ -19,10 +19,8 @@ Vagrant.configure("2") do |config|
 
   nodes = [
     { name: "cp1", ip: "#{NET}.11", ssh_port: 50022 },
-    { name: "cp2", ip: "#{NET}.12", ssh_port: 50023 },
-    { name: "cp3", ip: "#{NET}.13", ssh_port: 50024 },
-    { name: "w1",  ip: "#{NET}.21", ssh_port: 50025 },
-    { name: "w2",  ip: "#{NET}.22", ssh_port: 50026 },
+    { name: "w1",  ip: "#{NET}.21", ssh_port: 50023 },
+    { name: "w2",  ip: "#{NET}.22", ssh_port: 50024 },
   ]
 
   nodes.each do |n|

@@ -1,22 +1,22 @@
 
-# Rocky Linux 9 test lab (RHEL-like) — K3s HA (3 CP) + 2 workers
+# Rocky Linux 9 test lab (RHEL-like) — K3s Cluster (1 CP + 2 workers)
 
 This folder provides a repeatable Vagrant environment using **Rocky Linux 9** to test the Ansible playbook and security
 hardening (firewalld/open ports) in a RHEL-like system.
 
 ## Topology
 
-Single cluster on a private network:
+Single control plane cluster on a private network (optimized for CI performance):
 
 - VIP / apiserver endpoint: `192.168.56.10`
-- Control planes (3):
+- Control plane (1):
   - cp1: `192.168.56.11`
-  - cp2: `192.168.56.12`
-  - cp3: `192.168.56.13`
 - Workers (2):
   - w1: `192.168.56.21`
   - w2: `192.168.56.22`
 - MetalLB pool: `192.168.56.200-192.168.56.210`
+
+**Note**: For HA (3 control planes), add cp2/cp3 to the Vagrantfile and hosts.ini. This single-CP config reduces CI resource usage.
 
 ## Requirements
 
@@ -106,5 +106,5 @@ sudo ss -tulpn
 ## Notes / gotchas
 
 * Rocky uses **firewalld** by default and is the best place to validate your `firewall_secure` role behavior.
-* If HA breaks under tight firewall rules, confirm control-plane-to-control-plane connectivity (etcd/cluster traffic).
+* This test environment uses a single control plane for CI efficiency. For HA testing (3 CPs), add cp2/cp3 to Vagrantfile and hosts.ini.
 * If networking assertions fail, double-check `flannel_iface` exists and has IPv4 (commonly `eth1` in Vagrant).

@@ -134,7 +134,13 @@ jobs:
       - name: Start test VMs
         run: |
           cd tests/vagrant
-          sg libvirt -c "vagrant up --provider=libvirt"
+          
+          # Check libvirt network status
+          sg libvirt -c "virsh net-list --all" || true
+          sg libvirt -c "virsh net-start default" || true
+          
+          # Start VMs sequentially to avoid network race conditions
+          sg libvirt -c "vagrant up --no-parallel --provider=libvirt"
       
       - name: Run connectivity check
         run: |
