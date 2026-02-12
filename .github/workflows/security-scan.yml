@@ -41,7 +41,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [rocky9, ubuntu]
+        platform: [rocky9]  # ubuntu tests removed, rocky9 uses tests/vagrant/
 
     steps:
       - uses: actions/checkout@v4
@@ -161,7 +161,7 @@ jobs:
           set -euxo pipefail
           source .github/scripts/env.sh
 
-          cd tests/${{ matrix.platform }}
+          cd tests/vagrant  # rocky9 tests are in tests/vagrant/
 
           # Rocky: ensure box exists
           if [[ "${{ matrix.platform }}" == "rocky9" ]]; then
@@ -180,7 +180,7 @@ jobs:
       - name: Deploy K3s with security hardening
         run: |
           set -euxo pipefail
-          ansible-playbook -i tests/${{ matrix.platform }}/hosts.ini playbook.yaml
+          ansible-playbook -i tests/vagrant/hosts.ini playbook.yaml
 
       - name: Run comprehensive security test suite
         shell: bash
@@ -195,7 +195,7 @@ jobs:
 
           # Run full security test suite
           bash run-security-tests.sh \
-            --inventory ../tests/${{ matrix.platform }}/hosts.ini \
+            --inventory ../tests/vagrant/hosts.ini \
             --output-dir ../../reports/${{ matrix.platform }}/${{ steps.params.outputs.timestamp }} \
             ${QUICK_FLAG} \
             --verbose || echo "Some tests failed - check reports"
@@ -290,7 +290,7 @@ jobs:
         if: always()
         run: |
           set -euxo pipefail
-          cd tests/${{ matrix.platform }}
+          cd tests/vagrant
           sg libvirt -c "vagrant destroy -f" || true
 
   # Aggregate results from both platforms
