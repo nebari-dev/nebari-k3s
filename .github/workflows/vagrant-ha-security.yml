@@ -94,7 +94,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          source tests/bin/env.sh
+          source .github/scripts/env.sh
           echo "PROVIDER=${PROVIDER}"
           echo "ROCKY_BOX_NAME=${ROCKY_BOX_NAME:-}"
           echo "ROCKY_BOX_URL=${ROCKY_BOX_URL:-}"
@@ -138,7 +138,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          source tests/bin/env.sh
+          source .github/scripts/env.sh
 
           cd tests/${{ matrix.platform }}
 
@@ -158,9 +158,9 @@ jobs:
 
           cd -  # repo root
 
-          ansible-playbook -i tests/${{ matrix.platform }}/inventories/hosts.ini playbook.yaml
+          ansible-playbook -i tests/${{ matrix.platform }}/hosts.ini playbook.yaml
 
-          bash tests/bin/security-scan.sh tests/${{ matrix.platform }}/inventories/hosts.ini
+          bash .github/scripts/security-scan.sh tests/${{ matrix.platform }}/hosts.ini
 
       - name: Run comprehensive security test suite
         if: always()
@@ -171,7 +171,7 @@ jobs:
 
           # Run security tests in quick mode to avoid timeouts
           bash run-security-tests.sh \
-            --inventory ../tests/${{ matrix.platform }}/inventories/hosts.ini \
+            --inventory ../tests/${{ matrix.platform }}/hosts.ini \
             --output-dir ../../reports/${{ matrix.platform }} \
             --quick \
             --verbose || true
@@ -189,7 +189,7 @@ jobs:
           name: security-reports-${{ matrix.platform }}-${{ github.run_number }}
           path: |
             reports/${{ matrix.platform }}/**
-            tests/bin/security-scan-*.log
+            .github/scripts/security-scan-*.log
           retention-days: 30
 
       - name: Cleanup VMs (always)

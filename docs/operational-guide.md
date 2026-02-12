@@ -2,7 +2,7 @@
 
 This guide covers three important operational improvements for managing your k3s clusters safely and efficiently.
 
----
+
 
 ## 1. 🔍 Dry-Run Mode (Plan/Diff)
 
@@ -12,7 +12,7 @@ The dry-run script shows exactly what would change **without** making any modifi
 
 ```bash
 # Basic dry-run against vagrant lab
-./scripts/dry-run.sh -i tests/rocky9/inventories/hosts.ini
+./scripts/dry-run.sh -i tests/vagrant/hosts.ini
 
 # Dry-run on production with verbose output
 ./scripts/dry-run.sh -i inventory/production.ini -v
@@ -53,15 +53,15 @@ The dry-run script shows exactly what would change **without** making any modifi
    ```
 
 2. **Review the output carefully** before applying
-   
+
 3. **Use for change review in PRs**
    ```bash
-   ./scripts/dry-run.sh -i tests/rocky9/inventories/hosts.ini > ci-dry-run.log
+   ./scripts/dry-run.sh -i tests/vagrant/hosts.ini > ci-dry-run.log
    ```
 
 4. **Document expected changes** in your deployment plan
 
----
+
 
 ## 2. 🔌 Connectivity Check
 
@@ -80,7 +80,7 @@ ansible-playbook -i inventory/hosts.ini connectivity-check.yaml -l master
 ansible-playbook -i inventory/hosts.ini connectivity-check.yaml -e connectivity_check_verbose=true
 
 # Check vagrant lab
-ansible-playbook -i tests/rocky9/inventories/hosts.ini connectivity-check.yaml
+ansible-playbook -i tests/vagrant/hosts.ini connectivity-check.yaml
 ```
 
 ### What it validates
@@ -122,7 +122,7 @@ ansible-playbook -i inventory/production.ini connectivity-check.yaml
 ansible-playbook -i inventory/production.ini playbook.yaml
 ```
 
----
+
 
 ## 3. 🔄 Idempotent K3s Installation
 
@@ -196,7 +196,7 @@ ansible-playbook -i inventory/hosts.ini connectivity-check.yaml -l worker-1
 ansible-playbook -i inventory/hosts.ini playbook.yaml -l worker-1
 ```
 
----
+
 
 ## 🚀 Complete Workflow Example
 
@@ -245,7 +245,7 @@ ansible-playbook -i inventory/hosts.ini connectivity-check.yaml -l broken-node -
 ansible-playbook -i inventory/hosts.ini playbook.yaml -l broken-node
 ```
 
----
+
 
 ## 📝 CI/CD Integration
 
@@ -268,7 +268,7 @@ steps:
       ansible-playbook -i inventory/staging.ini playbook.yaml
 ```
 
----
+
 
 ## ⚠️ Important Notes
 
@@ -282,7 +282,7 @@ steps:
 
 5. **Service state**: Checks rely on systemd, ensure systems use systemd
 
----
+
 
 ## 🎯 Quick Reference
 
@@ -295,6 +295,6 @@ steps:
 | Fix one node | Add `-l <node>` to any command |
 | Verbose mode | Add `-v`, `-vv`, or `-vvv` |
 
----
+
 
 **Need help?** Check the main [README.md](README.md) or open an issue.

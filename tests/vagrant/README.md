@@ -21,15 +21,34 @@ Single cluster on a private network:
 ## Requirements
 
 - Vagrant
-- VirtualBox or QEMU (macOS)
+- **Linux**: libvirt (recommended) or VirtualBox
+- **macOS Intel**: VirtualBox
+- **macOS Apple Silicon**: ⚠️ Not supported - see below
 - Ansible (run from repo root)
 
 The default box is `generic/rocky9` which supports multiple providers.
 
+### ⚠️ macOS Apple Silicon Users
+
+Vagrant with QEMU has severe limitations on Apple Silicon:
+- **Memory limit**: Max 2GB per VM (highmem=off constraint)
+- **SSH timeouts**: Frequently hangs during provisioning
+- **No networking**: QEMU provider doesn't support `vm.network` configs
+- **Docker provider**: Containers exit immediately (systemd incompatibility)
+
+**Recommended alternatives:**
+1. 🌐 **Cloud VMs** (DigitalOcean, Hetzner, Linode) - $6-10/month, realistic testing
+2. 🐳 **Docker testing**: `./scripts/test-docker.sh` for syntax validation only
+3. 🤖 **GitHub Actions**: Push to branch and let CI validate
+
+See [macOS Testing Guide](../../docs/macos-testing.md) for cloud setup instructions.
+
+**TL;DR**: Local testing on Apple Silicon is not practical - use cloud VMs.
+
 ## Bring up / destroy
 
 ```bash
-cd tests/rocky9
+cd tests/vagrant
 vagrant up
 vagrant status
 ````
@@ -45,13 +64,13 @@ vagrant destroy -f
 From the **repo root**:
 
 ```bash
-ansible-playbook -i tests/rocky9/inventories/hosts.ini playbook.yaml
+ansible-playbook -i tests/vagrant/hosts.ini playbook.yaml
 ```
 
 If you need to force python path:
 
 ```bash
-ansible-playbook -i tests/rocky9/inventories/hosts.ini playbook.yaml \
+ansible-playbook -i tests/vagrant/hosts.ini playbook.yaml \
   -e ansible_python_interpreter=/usr/bin/python3
 ```
 
@@ -64,7 +83,7 @@ This lab assumes:
 * `k3s_node_cidrs: [192.168.56.0/24]`
 * `metal_lb_ip_range: "192.168.56.200-192.168.56.210"`
 
-See: `tests/rocky9/group_vars/all.yaml`
+See: `tests/vagrant/hosts.ini` [k3s_cluster:vars] section
 
 ## Security testing quick commands
 

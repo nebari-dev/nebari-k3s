@@ -101,8 +101,8 @@ Welcome to the K3s deployment documentation. This collection provides comprehens
 
 ### Storage Options
 **File**: `storage-options.md`  
-**Length**: ~600 lines  
-**Topics**: Default storage, local-path, Longhorn, NFS, Rook-Ceph, cloud storage, migration
+**Length**: ~500 lines  
+**Topics**: Default storage, local-path, Longhorn, NFS, Rook-Ceph, migration
 
 **When to use**: Choosing storage backend, migrating storage, setting up persistent volumes
 
@@ -112,7 +112,6 @@ Welcome to the K3s deployment documentation. This collection provides comprehens
 - Longhorn (distributed block storage)
 - NFS Storage (shared storage setup)
 - Rook-Ceph (enterprise distributed storage)
-- Cloud Provider Storage (EBS, Azure Disk, GCP PD)
 - Migration Strategies (between storage types)
 - Storage comparison table
 

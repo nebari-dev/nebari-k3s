@@ -208,7 +208,8 @@ The following ports are explicitly blocked from public access:
 | `k3s_enable_embedded_etcd` | `true` | Use embedded etcd for HA |
 | `k3s_enable_ipv6` | `false` | Enable IPv6 support |
 
-**📖 Complete Reference**: See [Configuration Variables](docs/configuration-variables.md) for detailed documentation of all 50+ available variables
+**📖 Complete Reference**: See [Configuration Variables](docs/configuration-variables.md) for detailed documentation of
+all 50+ available variables
 
 ## 🚀 Deployment Scenarios
 
@@ -244,9 +245,10 @@ k3s_ingress_allowed_cidrs: [203.0.113.0/24, 198.51.100.0/24]  # Specific CIDRs
 k3s_expose_nodeports_publicly: false
 ```
 
-**📖 More Examples**: See [Configuration Variables](docs/configuration-variables.md#configuration-templates) for complete templates
+**📖 More Examples**: See [Configuration Variables](docs/configuration-variables.md#configuration-templates) for
+complete templates
 
----
+
 
 ## 💾 Storage Options
 
@@ -285,7 +287,8 @@ helm install nfs-provisioner \
   --set nfs.path=/export/k8s-storage
 ```
 
-**📖 Detailed Guide**: See [Storage Options](docs/storage-options.md) for complete setup instructions, migration strategies, and comparison
+**📖 Detailed Guide**: See [Storage Options](docs/storage-options.md) for complete setup instructions, migration
+strategies, and comparison
 
 ## 🔍 Troubleshooting
 
@@ -367,7 +370,7 @@ A comprehensive security test suite is provided to validate all security patches
 cd tests/security-suite
 
 # Test against Rocky9 vagrant lab
-./quickstart.sh ../rocky9/inventories/hosts.ini
+./quickstart.sh ../rocky9/hosts.ini
 
 # Test against production cluster
 ./quickstart.sh ../../inventories/production.ini reports/prod
@@ -428,7 +431,7 @@ Compare security posture before and after hardening:
 ./capture-baseline.sh OLD_CLUSTER_IP old-baseline.json
 
 # Run full test suite on new cluster
-./run-security-tests.sh -i ../rocky9/inventories/hosts.ini -o reports/
+./run-security-tests.sh -i ../rocky9/hosts.ini -o reports/
 
 # Generate comparison report
 ./compare-clusters.sh old-baseline.json reports/security-report.json --html comparison.html
@@ -446,7 +449,7 @@ Target compliance score: **≥90%**
 
 See [tests/security-suite/README.md](tests/security-suite/README.md) for detailed documentation.
 
----
+
 
 ## 🆘 Support
 
@@ -484,14 +487,14 @@ sudo firewall-cmd --zone=public --list-ports | grep -E "80|443"
 ### Documentation Resources
 
 - **[Security Guide](SECURITY.md)** - Comprehensive troubleshooting section
-- **[Quick Reference](QUICK-REFERENCE.md)** - Emergency procedures and fixes  
+- **[Quick Reference](QUICK-REFERENCE.md)** - Emergency procedures and fixes
 - **[Network Configuration](docs/network-configuration.md)** - Network troubleshooting
 - **[Storage Options](docs/storage-options.md)** - Storage troubleshooting
 - **[Migration Guide](MIGRATION.md)** - Common migration issues
 
 ### Getting Help
 
-1. **Check logs**: 
+1. **Check logs**:
    ```bash
    journalctl -u firewalld -n 100
    journalctl -u k3s -n 100  # or k3s-agent

@@ -26,7 +26,7 @@ OPTIONS:
 
 EXAMPLES:
     # Dry-run against vagrant lab
-    $0 -i tests/rocky9/inventories/hosts.ini
+    $0 -i tests/vagrant/hosts.ini
 
     # Check only firewall changes on master nodes
     $0 -i inventory/production.ini -l master -t firewall
@@ -139,7 +139,7 @@ ANSIBLE_CMD="ansible-playbook -i $INVENTORY $PLAYBOOK --check --diff $LIMIT $TAG
 if [[ -n "$OUTPUT_FILE" ]]; then
     echo -e "${BLUE}Saving output to: $OUTPUT_FILE${NC}"
     echo ""
-    
+
     # Run and save, also showing on screen
     $ANSIBLE_CMD 2>&1 | tee "$OUTPUT_FILE"
     EXIT_CODE=${PIPESTATUS[0]}

@@ -69,7 +69,7 @@ sudo mv trivy /usr/local/bin/
 cd tests/security-suite
 
 # Test against Rocky9 vagrant lab
-./run-security-tests.sh --inventory ../rocky9/inventories/hosts.ini --output-dir reports/
+./run-security-tests.sh --inventory ../rocky9/hosts.ini --output-dir reports/
 
 # Test against production cluster
 ./run-security-tests.sh --inventory ../../inventories/production.ini --output-dir reports/prod/
@@ -82,19 +82,19 @@ cd tests/security-suite
 
 ```bash
 # Port exposure tests only
-./tests/01-port-exposure.sh ../rocky9/inventories/hosts.ini
+./tests/01-port-exposure.sh ../rocky9/hosts.ini
 
 # Firewall configuration tests
-./tests/02-firewall-config.sh ../rocky9/inventories/hosts.ini
+./tests/02-firewall-config.sh ../rocky9/hosts.ini
 
 # Network segmentation tests
-./tests/03-network-segmentation.sh ../rocky9/inventories/hosts.ini
+./tests/03-network-segmentation.sh ../rocky9/hosts.ini
 
 # Compliance tests (CIS + NIST)
-./tests/04-compliance.sh ../rocky9/inventories/hosts.ini
+./tests/04-compliance.sh ../rocky9/hosts.ini
 
 # K3s security tests
-./tests/05-k3s-security.sh ../rocky9/inventories/hosts.ini
+./tests/05-k3s-security.sh ../rocky9/hosts.ini
 ```
 
 ## 📊 Reports Generated
@@ -243,7 +243,7 @@ The comparison tool analyzes before/after state:
 ./capture-baseline.sh OLD_CLUSTER_IP > reports/baseline-old.json
 
 # Run tests on new cluster
-./run-security-tests.sh --inventory ../rocky9/inventories/hosts.ini --output-dir reports/
+./run-security-tests.sh --inventory ../rocky9/hosts.ini --output-dir reports/
 
 # Compare
 ./compare-clusters.sh reports/baseline-old.json reports/security-report.json --html reports/migration-comparison.html
@@ -326,7 +326,7 @@ report_format: ["json", "html", "csv"]
 
 ```bash
 # Verify SSH access
-ansible all -i ../rocky9/inventories/hosts.ini -m ping
+ansible all -i ../rocky9/hosts.ini -m ping
 
 # Check firewall allows test traffic
 sudo firewall-cmd --zone=public --add-rich-rule='rule family="ipv4" source address="TEST_IP/32" accept'

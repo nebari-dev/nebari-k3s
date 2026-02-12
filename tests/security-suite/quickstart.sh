@@ -25,7 +25,7 @@ if [[ $# -lt 1 ]]; then
   echo "Usage: $0 <inventory.ini> [output-dir]"
   echo ""
   echo "Examples:"
-  echo "  $0 ../rocky9/inventories/hosts.ini"
+  echo "  $0 ../rocky9/hosts.ini"
   echo "  $0 ../../inventories/production.ini reports/prod"
   exit 1
 fi

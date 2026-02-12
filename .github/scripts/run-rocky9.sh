@@ -2,9 +2,9 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-cd "${ROOT}/tests/rocky9"
+cd "${ROOT}/tests/vagrant"
 
-source "${ROOT}/tests/bin/env.sh"
+source "${ROOT}/.github/scripts/env.sh"
 
 # Pre-add box (idempotent-ish)
 vagrant box add --name "${ROCKY_BOX_NAME}" "${ROCKY_BOX_URL}" --provider=libvirt || true
@@ -12,6 +12,6 @@ vagrant box add --name "${ROCKY_BOX_NAME}" "${ROCKY_BOX_URL}" --provider=libvirt
 vagrant up --provider="${PROVIDER}"
 
 cd "${ROOT}"
-ansible-playbook -i tests/rocky9/inventories/hosts.ini playbook.yaml
+ansible-playbook -i tests/vagrant/hosts.ini playbook.yaml
 
-"${ROOT}/tests/bin/security-scan.sh" tests/rocky9/inventories/hosts.ini
+"${ROOT}/.github/scripts/security-scan.sh" tests/vagrant/hosts.ini

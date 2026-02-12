@@ -41,13 +41,13 @@ OPTIONS:
 
 EXAMPLES:
   # Test Rocky9 vagrant lab
-  $0 -i ../rocky9/inventories/hosts.ini
+  $0 -i ../rocky9/hosts.ini
 
   # Test production cluster with verbose output
   $0 -i ../../inventories/production.ini -o reports/prod -v
 
   # Quick security check
-  $0 -i ../rocky9/inventories/hosts.ini -q
+  $0 -i ../rocky9/hosts.ini -q
 
 EOF
   exit 1
