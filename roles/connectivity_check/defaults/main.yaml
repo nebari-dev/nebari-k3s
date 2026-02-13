@@ -1,0 +1,27 @@
+---
+# Role: connectivity_check
+# Simple connectivity and access validation for all nodes
+connectivity_check_commands:
+  - name: "Hostname"
+    cmd: "hostname"
+  - name: "Uptime"
+    cmd: "uptime"
+  - name: "Disk Space"
+    cmd: "df -h /"
+  - name: "Memory"
+    cmd: "free -h"
+  - name: "Network Interfaces"
+    cmd: "ip addr show"
+  - name: "Default Route"
+    cmd: "ip route show default"
+  - name: "DNS Resolution"
+    cmd: "getent hosts google.com"
+
+# Test network connectivity to other nodes
+connectivity_check_test_ports:
+  - 22    # SSH
+  - 6443  # K8s API
+  - 10250 # Kubelet
+
+# Enable detailed output
+connectivity_check_verbose: false

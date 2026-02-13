@@ -1,3 +1,4 @@
+# /roles/k3s_master/defaults/main.yaml
 ---
 ansible_user: ansible
 
@@ -19,7 +20,7 @@ extra_server_args: >-
   --tls-san {{ apiserver_endpoint }}
   --disable servicelb
   --disable traefik
-  --write-kubeconfig-mode 644
+  --write-kubeconfig-mode {{ k3s_write_kubeconfig_mode | default('0600') }}
   --flannel-iface={{ flannel_iface }}
 
 # BY default if --cluster-init is not given to any of the master nodes, k3s assumes a

@@ -1,0 +1,56 @@
+---
+# Security Hardening Role Defaults
+
+# Public-facing interface to restrict (auto-detected if not set)
+security_public_interface: "{{ ansible_default_ipv4.interface | default('eth0') }}"
+
+# Private/internal interface for cluster communication
+security_private_interface: "eth1"
+
+# Ports to block from public interface
+security_blocked_ports:
+  # Kubernetes management ports
+  - port: "6443"
+    protocol: "tcp"
+    description: "Kubernetes API server"
+  - port: "10250"
+    protocol: "tcp"
+    description: "Kubelet API"
+  - port: "2379:2380"
+    protocol: "tcp"
+    description: "etcd cluster"
+
+  # Monitoring/metrics
+  - port: "9100"
+    protocol: "tcp"
+    description: "Node exporter (Prometheus)"
+  - port: "10255"
+    protocol: "tcp"
+    description: "Kubelet read-only API"
+
+  # NodePort range (blocks all NodePort services from public access)
+  - port: "30000:32767"
+    protocol: "tcp"
+    description: "NodePort service range"
+  - port: "30000:32767"
+    protocol: "udp"
+    description: "NodePort service range (UDP)"
+
+# Whether to enable firewalld configuration as defense-in-depth
+security_configure_firewalld: true
+
+# Firewalld zones
+security_firewalld_public_zone: "public"
+security_firewalld_internal_zone: "internal"
+
+# Allowed services on public interface
+security_public_allowed_services:
+  - ssh
+  - http
+  - https
+
+# Whether to make iptables rules persistent
+security_make_persistent: true
+
+# Dry-run mode check (set via extra-vars or playbook)
+security_dry_run: false

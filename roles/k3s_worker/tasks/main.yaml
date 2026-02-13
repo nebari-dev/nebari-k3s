@@ -1,29 +1,70 @@
+# /roles/k3s_worker/tasks/main.yaml
 ---
+# ============================================
+# IDEMPOTENCY: Check if k3s agent is already installed and running
+# ============================================
+- name: Check if k3s binary exists
+  ansible.builtin.stat:
+    path: /usr/local/bin/k3s
+  register: k3s_installed
+
+- name: Check if k3s-agent service exists and is running
+  ansible.builtin.systemd:
+    name: k3s-agent
+  register: k3s_agent_service
+  failed_when: false
+  when: k3s_installed.stat.exists
+
+- name: Check k3s version if installed
+  ansible.builtin.command: /usr/local/bin/k3s --version
+  register: k3s_current_version
+  changed_when: false
+  failed_when: false
+  when: k3s_installed.stat.exists
+
+- name: Display current k3s agent status
+  ansible.builtin.debug:
+    msg: |
+      k3s installed: {{ k3s_installed.stat.exists }}
+      {% if k3s_installed.stat.exists %}
+      Current version: {{ k3s_current_version.stdout_lines[0] | default('unknown') }}
+      Service active: {{ k3s_agent_service.status.ActiveState | default('unknown') }}
+      {% endif %}
+      Target version: {{ k3s_version }}
+  when: k3s_installed.stat.exists
+
 - name: Download k3s install script
   ansible.builtin.get_url:
     url: https://get.k3s.io
     dest: /tmp/install_k3s.sh
     mode: '0755'
 
-
-# - name: Check if k3s is already installed
-#   ansible.builtin.stat:
-#     path: /usr/local/bin/k3s
-#   register: k3s_installed
-
-- name: Install k3s worker (only if not installed)
+# Only install/upgrade if needed
+- name: Install or upgrade k3s agent
   ansible.builtin.shell: |
     /tmp/install_k3s.sh agent \
       {{ extra_agent_args }} \
       --token={{ k3s_token }} \
       --server https://{{ apiserver_endpoint }}:6443
+  environment:
+    INSTALL_K3S_VERSION: "{{ k3s_version }}"
+  when: >
+    not k3s_installed.stat.exists or
+    (k3s_current_version.stdout is defined and k3s_version not in k3s_current_version.stdout) or
+    (k3s_agent_service.status is defined and k3s_agent_service.status.ActiveState != 'active')
+  no_log: true  # avoids token leakage in logs
 
-# - name: Join other masters to the cluster
-#   command: /tmp/install_k3s.sh server --token {{ k3s_token }} --tls-san {{ apiserver_endpoint }} --disable servicelb --disable traefik --server https://{{ groups['master'][0] }}:6443
-#   args:
-#     chdir: /tmp
-#   register: k3s_server
-#   when: inventory_hostname != groups['master'][0]
+- name: Ensure k3s-agent service is enabled and started
+  ansible.builtin.systemd:
+    name: k3s-agent
+    enabled: yes
+    state: started
+  register: k3s_agent_start
 
-
-  # when: not k3s_installed.stat.exists
+- name: Wait for k3s-agent service to be active
+  ansible.builtin.systemd:
+    name: k3s-agent
+  register: agent_status
+  retries: 10
+  delay: 5
+  until: agent_status.status.ActiveState == "active"

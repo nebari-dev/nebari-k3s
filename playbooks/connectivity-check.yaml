@@ -1,0 +1,45 @@
+---
+# Connectivity Check Playbook
+# Quick validation that all nodes are accessible and basic sysadmin commands work
+#
+# Usage:
+#   ansible-playbook -i inventory/hosts.ini connectivity-check.yaml
+#   ansible-playbook -i tests/vagrant/hosts.ini connectivity-check.yaml
+#
+# Options:
+#   -l master              # Check only master nodes
+#   -l node                # Check only worker nodes
+#   -e connectivity_check_verbose=true  # Show detailed output
+
+- name: Connectivity and Access Check
+  hosts: all
+  gather_facts: false  # We'll gather minimal facts in the role
+  become: false
+
+  tasks:
+    - name: Run connectivity check
+      ansible.builtin.include_role:
+        name: connectivity_check
+
+- name: Summary Report
+  hosts: localhost
+  gather_facts: false
+  run_once: true
+
+  tasks:
+    - name: Display final summary
+      ansible.builtin.debug:
+        msg: |
+          ╔════════════════════════════════════════════════════════════╗
+          ║           CONNECTIVITY CHECK COMPLETED                    ║
+          ╚════════════════════════════════════════════════════════════╝
+
+          ✓ All nodes accessible and responding
+          ✓ SSH and sudo access working
+          ✓ Basic system commands functional
+
+          Ready to run main playbook!
+
+          Next steps:
+            1. Dry-run: ./scripts/dry-run.sh -i <inventory>
+            2. Apply: ansible-playbook -i <inventory> playbook.yaml

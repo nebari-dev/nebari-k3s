@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "${ROOT}/tests/vagrant"
+
+source "${ROOT}/.github/scripts/env.sh"
+
+# Pre-add box (idempotent-ish)
+vagrant box add --name "${ROCKY_BOX_NAME}" "${ROCKY_BOX_URL}" --provider=libvirt || true
+
+vagrant up --provider="${PROVIDER}"
+
+cd "${ROOT}"
+ansible-playbook -i tests/vagrant/hosts.ini playbook.yaml
+
+"${ROOT}/.github/scripts/security-scan.sh" tests/vagrant/hosts.ini

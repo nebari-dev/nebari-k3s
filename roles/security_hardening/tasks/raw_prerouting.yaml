@@ -1,0 +1,82 @@
+---
+# raw/PREROUTING iptables rules
+#
+# CRITICAL: These rules MUST be in the raw table's PREROUTING chain
+# because kube-router's NAT rules in nat/PREROUTING happen AFTER this.
+#
+# Traffic flow:
+#   1. raw/PREROUTING    ← We block HERE (before any processing)
+#   2. nat/PREROUTING    ← kube-router's NodePort DNAT happens here
+#   3. filter/FORWARD    ← Too late, already DNAT'd to pod
+#
+# If we blocked in filter/INPUT or filter/FORWARD, NodePort traffic
+# would already be DNAT'd to pod IPs and bypass our rules!
+
+- name: Check if iptables is available
+  ansible.builtin.command: which iptables
+  register: iptables_check
+  changed_when: false
+  failed_when: false
+
+- name: Fail if iptables not found
+  ansible.builtin.fail:
+    msg: "iptables command not found. Please install iptables package."
+  when: iptables_check.rc != 0
+
+- name: Get current raw/PREROUTING rules
+  ansible.builtin.command: iptables -t raw -L PREROUTING -n --line-numbers
+  register: current_raw_rules
+  changed_when: false
+  check_mode: false
+
+- name: Display current raw/PREROUTING rules
+  ansible.builtin.debug:
+    msg: "{{ current_raw_rules.stdout_lines }}"
+    verbosity: 1
+
+- name: Add raw/PREROUTING rules to block public interface traffic
+  ansible.builtin.iptables:
+    table: raw
+    chain: PREROUTING
+    in_interface: "{{ security_public_interface }}"
+    protocol: "{{ item.protocol }}"
+    destination_port: "{{ item.port }}"
+    jump: DROP
+    comment: "nebari-k3s: Block {{ item.description }}"
+    action: insert
+    rule_num: "1"
+  loop: "{{ security_blocked_ports }}"
+  when: not (security_dry_run | default(false))
+  register: iptables_rules_added
+  notify: Save iptables rules
+
+- name: Display dry-run information
+  ansible.builtin.debug:
+    msg: |
+      [DRY-RUN MODE] Would add the following iptables rules:
+      {% for item in security_blocked_ports %}
+      iptables -t raw -I PREROUTING 1 -i {{ security_public_interface }} -p {{ item.protocol }} --dport {{ item.port }} -j DROP -m comment --comment "nebari-k3s: Block {{ item.description }}"
+      {% endfor %}
+  when: security_dry_run | default(false)
+
+- name: Check if rules were properly inserted
+  ansible.builtin.command: iptables -t raw -L PREROUTING -n --line-numbers
+  register: verify_raw_rules
+  changed_when: false
+  check_mode: false
+  when: not (security_dry_run | default(false))
+
+- name: Display installed rules
+  ansible.builtin.debug:
+    msg: "{{ verify_raw_rules.stdout_lines }}"
+  when:
+    - not (security_dry_run | default(false))
+    - verify_raw_rules is defined
+
+- name: Verify rules are in position 1-{{ security_blocked_ports | length }}
+  ansible.builtin.assert:
+    that:
+      - verify_raw_rules.stdout_lines | length > security_blocked_ports | length
+    fail_msg: "raw/PREROUTING rules not properly installed"
+    success_msg: "raw/PREROUTING rules successfully installed"
+  when: not (security_dry_run | default(false))

@@ -1,0 +1,66 @@
+---
+# Example: Security Hardening Playbook
+#
+# This playbook demonstrates how to use the security_hardening role
+# to protect K3s clusters from public internet access to sensitive services.
+#
+# IMPORTANT: Run this AFTER K3s is installed and running.
+
+- name: Apply Security Hardening to K3s Cluster
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    # Override these based on your infrastructure
+    # security_public_interface: "eth0"   # Auto-detected by default
+    # security_private_interface: "eth1"
+    
+    # Uncomment for dry-run (preview changes without applying)
+    # security_dry_run: true
+
+  pre_tasks:
+    - name: Display target hosts
+      ansible.builtin.debug:
+        msg: |
+          Applying security hardening to:
+          {% for host in ansible_play_hosts %}
+          - {{ host }} ({{ hostvars[host].ansible_default_ipv4.address | default('unknown') }})
+          {% endfor %}
+
+  roles:
+    - role: security_hardening
+      tags:
+        - security
+        - hardening
+
+  post_tasks:
+    - name: Security hardening complete
+      ansible.builtin.debug:
+        msg: |
+          ═══════════════════════════════════════════════════════
+          Security hardening applied successfully!
+          
+          Next steps:
+          1. Verify with: iptables -t raw -L PREROUTING -n
+          2. Test blocked ports: curl --max-time 5 http://<public-ip>:30001
+          3. Test allowed ports: curl http://<public-ip>:80
+          4. Review logs: journalctl -u k3s
+          ═══════════════════════════════════════════════════════
+
+# Example usage:
+#
+# 1. Basic run:
+#    ansible-playbook -i inventory.ini security-hardening.yaml
+#
+# 2. Dry-run mode:
+#    ansible-playbook -i inventory.ini security-hardening.yaml -e "security_dry_run=true"
+#
+# 3. Custom interface:
+#    ansible-playbook -i inventory.ini security-hardening.yaml -e "security_public_interface=ens3"
+#
+# 4. Skip firewalld:
+#    ansible-playbook -i inventory.ini security-hardening.yaml -e "security_configure_firewalld=false"
+#
+# 5. Validation only:
+#    ansible-playbook -i inventory.ini security-hardening.yaml --tags validate

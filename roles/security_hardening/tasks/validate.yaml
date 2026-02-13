@@ -1,0 +1,101 @@
+---
+# Validation tasks for security hardening
+# Verifies that rules are properly installed and working
+
+- name: Validation - Get raw/PREROUTING rules
+  ansible.builtin.command: iptables -t raw -L PREROUTING -n -v --line-numbers
+  register: validation_raw_rules
+  changed_when: false
+  check_mode: false
+  when: not (security_dry_run | default(false))
+
+- name: Validation - Display raw/PREROUTING table
+  ansible.builtin.debug:
+    msg: |
+      ═══════════════════════════════════════════════════════
+      raw/PREROUTING Rules (First {{ security_blocked_ports | length }} should be DROP)
+      ═══════════════════════════════════════════════════════
+      {{ validation_raw_rules.stdout }}
+      ═══════════════════════════════════════════════════════
+  when:
+    - not (security_dry_run | default(false))
+    - validation_raw_rules is defined
+
+- name: Validation - Check each blocked port rule exists
+  ansible.builtin.shell: |
+    iptables -t raw -L PREROUTING -n | grep -q "{{ item.port }}.*{{ item.protocol }}.*DROP"
+  register: rule_check
+  changed_when: false
+  failed_when: false
+  loop: "{{ security_blocked_ports }}"
+  when: not (security_dry_run | default(false))
+
+- name: Validation - Report missing rules
+  ansible.builtin.debug:
+    msg: "WARNING: Rule for {{ item.item.description }} ({{ item.item.port }}/{{ item.item.protocol }}) not found!"
+  loop: "{{ rule_check.results | default([]) }}"
+  when:
+    - not (security_dry_run | default(false))
+    - item.rc != 0
+
+- name: Validation - Count installed rules
+  ansible.builtin.set_fact:
+    installed_rules_count: "{{ rule_check.results | selectattr('rc', 'equalto', 0) | list | length }}"
+    expected_rules_count: "{{ security_blocked_ports | length }}"
+  when: not (security_dry_run | default(false))
+
+- name: Validation - Verify all rules installed
+  ansible.builtin.assert:
+    that:
+      - installed_rules_count | int == expected_rules_count | int
+    fail_msg: |
+      Security validation FAILED!
+      Expected {{ expected_rules_count }} rules, found {{ installed_rules_count }}
+    success_msg: |
+      ✓ Security validation PASSED
+      All {{ installed_rules_count }} raw/PREROUTING rules installed correctly
+  when: not (security_dry_run | default(false))
+
+- name: Validation - Check firewalld zones (if enabled)
+  ansible.builtin.command: firewall-cmd --get-active-zones
+  register: active_zones
+  changed_when: false
+  failed_when: false
+  when:
+    - security_configure_firewalld | bool
+    - not (security_dry_run | default(false))
+
+- name: Validation - Display firewalld zones
+  ansible.builtin.debug:
+    msg: |
+      Active firewalld zones:
+      {{ active_zones.stdout }}
+  when:
+    - security_configure_firewalld | bool
+    - not (security_dry_run | default(false))
+    - active_zones is defined
+
+- name: Validation - Security hardening summary
+  ansible.builtin.debug:
+    msg: |
+      ═══════════════════════════════════════════════════════
+      Security Hardening Summary
+      ═══════════════════════════════════════════════════════
+      Status: {% if security_dry_run | default(false) %}DRY-RUN (no changes made){% else %}ACTIVE{% endif %}
+
+      ✓ raw/PREROUTING rules: {{ installed_rules_count | default('N/A') }}/{{ expected_rules_count }} installed
+      ✓ Blocked ports on {{ security_public_interface }}:
+      {% for item in security_blocked_ports %}
+        - {{ item.port }}/{{ item.protocol }}: {{ item.description }}
+      {% endfor %}
+
+      ✓ Defense layers:
+        1. raw/PREROUTING (primary - blocks before NAT)
+      {% if security_configure_firewalld | bool %}
+        2. firewalld (secondary - defense-in-depth)
+      {% endif %}
+
+      ⚠  CRITICAL: These rules protect against kube-router's
+         NAT rules that would otherwise expose services on
+         the public interface.
+      ═══════════════════════════════════════════════════════
