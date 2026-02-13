@@ -1,0 +1,31 @@
+---
+# Handlers for security hardening
+
+- name: Save iptables rules
+  ansible.builtin.shell: |
+    if command -v iptables-save > /dev/null && command -v netfilter-persistent > /dev/null; then
+      # Debian/Ubuntu - use netfilter-persistent
+      netfilter-persistent save
+      echo "Rules saved via netfilter-persistent"
+    elif command -v iptables-save > /dev/null && [ -f /etc/sysconfig/iptables-config ]; then
+      # RHEL/CentOS/Rocky - use iptables-services
+      iptables-save > /etc/sysconfig/iptables
+      echo "Rules saved to /etc/sysconfig/iptables"
+    elif command -v iptables-save > /dev/null; then
+      # Fallback - save to common location
+      mkdir -p /etc/iptables
+      iptables-save > /etc/iptables/rules.v4
+      echo "Rules saved to /etc/iptables/rules.v4"
+    else
+      echo "WARNING: Could not save iptables rules - no save mechanism found"
+      exit 1
+    fi
+  args:
+    executable: /bin/bash
+  when: security_make_persistent | bool
+
+- name: Reload firewalld
+  ansible.builtin.systemd:
+    name: firewalld
+    state: reloaded
+  when: security_configure_firewalld | bool

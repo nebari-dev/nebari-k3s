@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [rocky9]  # ubuntu tests removed, rocky9 uses tests/vagrant/
+        platform: [rocky9]  # ubuntu tests removed, rocky9 uses tests/integration/vagrant/
 
     steps:
       - uses: actions/checkout@v4
@@ -102,7 +102,7 @@ jobs:
       - name: Validate Vagrantfile
         run: |
           set -euxo pipefail
-          cd tests/vagrant  # rocky9 tests are in tests/vagrant/
+          cd tests/integration/vagrant  # rocky9 tests are in tests/integration/vagrant/
           vagrant validate
 
       - name: Install Ansible
@@ -141,7 +141,7 @@ jobs:
           set -euxo pipefail
           source .github/scripts/env.sh
 
-          cd tests/vagrant  # rocky9 tests are in tests/vagrant/
+          cd tests/integration/vagrant  # rocky9 tests are in tests/integration/vagrant/
 
           # Rocky: ensure box exists (env.sh provides URL)
           if [[ "${{ matrix.platform }}" == "rocky9" ]]; then
@@ -153,10 +153,35 @@ jobs:
           sg libvirt -c "virsh net-start default" || true
           sg libvirt -c "virsh net-info default" || true
 
+          # Wait for DHCP servers to fully initialize
+          echo "Waiting for DHCP servers to initialize..."
+          sleep 10
+
           # Set timeout and use sg to run with libvirt group active
           export VAGRANT_DEFAULT_PROVIDER=libvirt
-          sg libvirt -c "vagrant up --provider=${PROVIDER}" 2>&1 | tee vagrant-up.log || {
-            echo "Vagrant up failed, showing VM status:"
+
+          # Start VMs sequentially to avoid concurrent DHCP requests
+          echo "Starting control plane node (cp1)..."
+          sg libvirt -c "vagrant up cp1 --provider=${PROVIDER}" 2>&1 | tee -a vagrant-up.log || {
+            echo "Vagrant up cp1 failed, showing VM status:"
+            sg libvirt -c "vagrant status" || true
+            sg libvirt -c "virsh list --all" || true
+            sg libvirt -c "virsh net-list --all" || true
+            exit 1
+          }
+
+          echo "Starting worker node 1 (w1)..."
+          sg libvirt -c "vagrant up w1 --provider=${PROVIDER}" 2>&1 | tee -a vagrant-up.log || {
+            echo "Vagrant up w1 failed, showing VM status:"
+            sg libvirt -c "vagrant status" || true
+            sg libvirt -c "virsh list --all" || true
+            sg libvirt -c "virsh net-list --all" || true
+            exit 1
+          }
+
+          echo "Starting worker node 2 (w2)..."
+          sg libvirt -c "vagrant up w2 --provider=${PROVIDER}" 2>&1 | tee -a vagrant-up.log || {
+            echo "Vagrant up w2 failed, showing VM status:"
             sg libvirt -c "vagrant status" || true
             sg libvirt -c "virsh list --all" || true
             sg libvirt -c "virsh net-list --all" || true
@@ -165,9 +190,9 @@ jobs:
 
           cd -  # repo root
 
-          ansible-playbook -i tests/vagrant/hosts.ini playbook.yaml
+          ansible-playbook -i tests/integration/vagrant/hosts.ini playbooks/site.yaml
 
-          bash .github/scripts/security-scan.sh tests/vagrant/hosts.ini
+          bash .github/scripts/security-scan.sh tests/integration/vagrant/hosts.ini
 
       - name: Run comprehensive security test suite
         if: always()
@@ -178,7 +203,7 @@ jobs:
 
           # Run security tests in quick mode to avoid timeouts
           bash run-security-tests.sh \
-            --inventory ../tests/vagrant/hosts.ini \
+            --inventory ../tests/integration/vagrant/hosts.ini \
             --output-dir ../../reports/${{ matrix.platform }} \
             --quick \
             --verbose || true
@@ -203,5 +228,5 @@ jobs:
         if: always()
         run: |
           set -euxo pipefail
-          cd tests/vagrant
+          cd tests/integration/vagrant
           sg libvirt -c "vagrant destroy -f" || true

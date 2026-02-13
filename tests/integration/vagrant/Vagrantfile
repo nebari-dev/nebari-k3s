@@ -30,7 +30,7 @@ Vagrant.configure("2") do |config|
 
       # Network configuration (libvirt supports private_network)
       # Use vagrant-libvirt default network which is pre-configured
-      vm.vm.network "private_network", 
+      vm.vm.network "private_network",
         ip: n[:ip],
         libvirt__dhcp_enabled: true
 

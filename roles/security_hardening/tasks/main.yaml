@@ -1,0 +1,56 @@
+---
+# Security Hardening Tasks
+# Implements raw/PREROUTING iptables rules to block public interface traffic
+# before kube-router NAT rules can process them
+
+- name: Display security hardening info
+  ansible.builtin.debug:
+    msg: |
+      ═══════════════════════════════════════════════════════
+      Security Hardening Role
+      ═══════════════════════════════════════════════════════
+      Public Interface: {{ security_public_interface }}
+      Private Interface: {{ security_private_interface }}
+      Dry-run Mode: {{ security_dry_run | default(false) }}
+
+      This role will:
+      1. Block sensitive ports on public interface (raw/PREROUTING)
+      2. Configure firewalld zones (defense-in-depth)
+      3. Make rules persistent across reboots
+      ═══════════════════════════════════════════════════════
+
+- name: Gather network facts
+  ansible.builtin.setup:
+    gather_subset:
+      - network
+      - interfaces
+
+- name: Detect public interface
+  ansible.builtin.set_fact:
+    detected_public_interface: "{{ ansible_default_ipv4.interface | default('eth0') }}"
+  when: security_public_interface is not defined or security_public_interface == ""
+
+- name: Display detected interfaces
+  ansible.builtin.debug:
+    msg:
+      - "Public interface: {{ security_public_interface }}"
+      - "Default IPv4: {{ ansible_default_ipv4.address | default('unknown') }}"
+      - "All interfaces: {{ ansible_interfaces }}"
+
+- name: Include raw/PREROUTING iptables tasks
+  ansible.builtin.include_tasks: raw_prerouting.yaml
+  tags:
+    - iptables
+    - raw-prerouting
+
+- name: Include firewalld hardening tasks
+  ansible.builtin.include_tasks: firewalld.yaml
+  when: security_configure_firewalld | bool
+  tags:
+    - firewalld
+
+- name: Include validation tasks
+  ansible.builtin.include_tasks: validate.yaml
+  tags:
+    - validate
+    - always

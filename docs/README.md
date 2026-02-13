@@ -1,6 +1,7 @@
 # Documentation Index
 
-Welcome to the K3s deployment documentation. This collection provides comprehensive guides for deploying, configuring, and managing your K3s cluster.
+Welcome to the K3s deployment documentation. This collection provides comprehensive guides for deploying, configuring,
+and managing your K3s cluster.
 
 ## 📚 Documentation Structure
 
@@ -25,7 +26,7 @@ Welcome to the K3s deployment documentation. This collection provides comprehens
 
 - **[Inventory Examples](../INVENTORY-EXAMPLE.md)** - Sample inventory configurations
 
----
+
 
 ## 🎯 Quick Navigation
 
@@ -59,14 +60,13 @@ Welcome to the K3s deployment documentation. This collection provides comprehens
 2. Review [Configuration Variables](configuration-variables.md) for security settings
 3. Use [Quick Reference](../QUICK-REFERENCE.md) for validation
 
----
+
 
 ## 📖 Document Descriptions
 
 ### Configuration Variables
-**File**: `configuration-variables.md`  
-**Length**: ~600 lines  
-**Topics**: Core K3s settings, network config, security settings, HA, MetalLB, Kube-VIP, component toggles
+**File**: `configuration-variables.md` **Length**: ~600 lines **Topics**: Core K3s settings, network config, security
+settings, HA, MetalLB, Kube-VIP, component toggles
 
 **When to use**: Setting up cluster configuration, understanding available options, troubleshooting settings
 
@@ -78,12 +78,11 @@ Welcome to the K3s deployment documentation. This collection provides comprehens
 - MetalLB & Kube-VIP configuration
 - Variable override hierarchy
 
----
+
 
 ### Network Configuration
-**File**: `network-configuration.md`  
-**Length**: ~550 lines  
-**Topics**: Network architecture, CNI options, Flannel backends, services, ingress, network policies, troubleshooting
+**File**: `network-configuration.md` **Length**: ~550 lines **Topics**: Network architecture, CNI options, Flannel
+backends, services, ingress, network policies, troubleshooting
 
 **When to use**: Setting up pod networking, configuring ingress, troubleshooting connectivity issues
 
@@ -97,12 +96,11 @@ Welcome to the K3s deployment documentation. This collection provides comprehens
 - Network Policies (examples, troubleshooting)
 - Troubleshooting guide
 
----
+
 
 ### Storage Options
-**File**: `storage-options.md`  
-**Length**: ~500 lines  
-**Topics**: Default storage, local-path, Longhorn, NFS, Rook-Ceph, migration
+**File**: `storage-options.md` **Length**: ~500 lines **Topics**: Default storage, local-path, Longhorn, NFS, Rook-Ceph,
+migration
 
 **When to use**: Choosing storage backend, migrating storage, setting up persistent volumes
 
@@ -115,12 +113,11 @@ Welcome to the K3s deployment documentation. This collection provides comprehens
 - Migration Strategies (between storage types)
 - Storage comparison table
 
----
+
 
 ### Security Guide
-**File**: `../SECURITY.md`  
-**Length**: ~380 lines  
-**Topics**: Firewall zones, port security, access control, best practices, compliance
+**File**: `../SECURITY.md` **Length**: ~380 lines **Topics**: Firewall zones, port security, access control, best
+practices, compliance
 
 **When to use**: Understanding security architecture, configuring firewalls, validating security posture
 
@@ -136,12 +133,11 @@ Welcome to the K3s deployment documentation. This collection provides comprehens
 - Security Best Practices
 - Troubleshooting
 
----
+
 
 ### Migration Guide
-**File**: `../MIGRATION.md`  
-**Length**: ~380 lines  
-**Topics**: Safe upgrade process, pre-migration checks, rollback procedures, common issues
+**File**: `../MIGRATION.md` **Length**: ~380 lines **Topics**: Safe upgrade process, pre-migration checks, rollback
+procedures, common issues
 
 **When to use**: Upgrading from old firewall configuration to new secure setup
 
@@ -155,12 +151,11 @@ Welcome to the K3s deployment documentation. This collection provides comprehens
 - Common Issues & Fixes
 - Performance Impact Notes
 
----
+
 
 ### Quick Reference
-**File**: `../QUICK-REFERENCE.md`  
-**Length**: ~380 lines  
-**Topics**: Command cheat sheet, diagnostic tools, emergency procedures
+**File**: `../QUICK-REFERENCE.md` **Length**: ~380 lines **Topics**: Command cheat sheet, diagnostic tools, emergency
+procedures
 
 **When to use**: Daily operations, troubleshooting, quick fixes
 
@@ -175,12 +170,11 @@ Welcome to the K3s deployment documentation. This collection provides comprehens
 - Security validation tests
 - Ansible quick commands
 
----
+
 
 ### Inventory Examples
-**File**: `../INVENTORY-EXAMPLE.md`  
-**Length**: ~370 lines  
-**Topics**: Sample inventories, connection setup, network planning
+**File**: `../INVENTORY-EXAMPLE.md` **Length**: ~370 lines **Topics**: Sample inventories, connection setup, network
+planning
 
 **When to use**: Creating initial inventory, setting up Ansible connection
 
@@ -194,7 +188,7 @@ Welcome to the K3s deployment documentation. This collection provides comprehens
 - Bastion host configuration
 - Verification commands
 
----
+
 
 ## 🔍 Topic Index
 
@@ -222,7 +216,7 @@ Welcome to the K3s deployment documentation. This collection provides comprehens
 - [Quick Reference](../QUICK-REFERENCE.md) - Diagnostic commands
 - [Migration Guide](../MIGRATION.md#common-migration-issues) - Migration issues
 
----
+
 
 ## 📝 Contributing to Documentation
 
@@ -235,7 +229,7 @@ When adding or updating documentation:
 5. **Test commands**: Verify all commands work
 6. **Update README**: Reflect changes in main README
 
----
+
 
 ## 🆘 Getting Help
 
@@ -245,7 +239,7 @@ When adding or updating documentation:
 4. **Validate configuration**: Use validation commands
 5. **Check logs**: Review firewalld and K3s logs
 
----
+
 
 ## 📄 Document Templates
 

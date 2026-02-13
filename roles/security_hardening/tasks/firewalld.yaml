@@ -1,0 +1,117 @@
+---
+# Firewalld configuration (defense-in-depth)
+#
+# While raw/PREROUTING is our primary defense, firewalld provides:
+# 1. Defense-in-depth (redundant protection)
+# 2. Better manageability for admins familiar with firewalld
+# 3. Protection if iptables rules are accidentally flushed
+# 4. Clear zone-based security model
+
+- name: Check if firewalld is available
+  ansible.builtin.systemd:
+    name: firewalld
+  register: firewalld_status
+  failed_when: false
+  check_mode: false
+
+- name: Install firewalld if missing
+  ansible.builtin.package:
+    name: firewalld
+    state: present
+  when:
+    - firewalld_status.status is not defined or firewalld_status.status.ActiveState != "active"
+    - not (security_dry_run | default(false))
+
+- name: Ensure firewalld is running
+  ansible.builtin.systemd:
+    name: firewalld
+    state: started
+    enabled: true
+  when: not (security_dry_run | default(false))
+
+- name: Configure public zone (restrictive)
+  ansible.posix.firewalld:
+    zone: "{{ security_firewalld_public_zone }}"
+    interface: "{{ security_public_interface }}"
+    permanent: true
+    immediate: true
+    state: enabled
+  when: not (security_dry_run | default(false))
+
+- name: Set public zone default target to DROP
+  ansible.builtin.command: >
+    firewall-cmd --permanent --zone={{ security_firewalld_public_zone }} --set-target=DROP
+  changed_when: true
+  when: not (security_dry_run | default(false))
+  notify: Reload firewalld
+
+- name: Allow specific services on public interface
+  ansible.posix.firewalld:
+    zone: "{{ security_firewalld_public_zone }}"
+    service: "{{ item }}"
+    permanent: true
+    immediate: true
+    state: enabled
+  loop: "{{ security_public_allowed_services }}"
+  when: not (security_dry_run | default(false))
+
+- name: Block NodePort range on public zone (rich rule)
+  ansible.posix.firewalld:
+    zone: "{{ security_firewalld_public_zone }}"
+    rich_rule: 'rule port port="30000-32767" protocol="{{ item }}" reject'
+    permanent: true
+    immediate: true
+    state: enabled
+  loop:
+    - tcp
+    - udp
+  when: not (security_dry_run | default(false))
+
+- name: Configure internal zone (permissive for cluster traffic)
+  ansible.posix.firewalld:
+    zone: "{{ security_firewalld_internal_zone }}"
+    interface: "{{ security_private_interface }}"
+    permanent: true
+    immediate: true
+    state: enabled
+  when:
+    - security_private_interface is defined
+    - not (security_dry_run | default(false))
+
+- name: Set internal zone target to ACCEPT
+  ansible.builtin.command: >
+    firewall-cmd --permanent --zone={{ security_firewalld_internal_zone }} --set-target=ACCEPT
+  changed_when: true
+  when:
+    - security_private_interface is defined
+    - not (security_dry_run | default(false))
+  notify: Reload firewalld
+
+- name: Add cluster IP ranges to internal zone
+  ansible.posix.firewalld:
+    zone: "{{ security_firewalld_internal_zone }}"
+    source: "{{ item }}"
+    permanent: true
+    immediate: true
+    state: enabled
+  loop:
+    - "10.42.0.0/16"  # Pod network (Flannel default)
+    - "10.43.0.0/16"  # Service network (K8s default)
+  when:
+    - security_private_interface is defined
+    - not (security_dry_run | default(false))
+
+- name: Display firewalld dry-run info
+  ansible.builtin.debug:
+    msg: |
+      [DRY-RUN MODE] Would configure firewalld:
+
+      Public Zone ({{ security_public_interface }}):
+        - Default target: DROP
+        - Allowed services: {{ security_public_allowed_services | join(', ') }}
+        - Blocked: NodePort range (30000-32767 tcp/udp)
+
+      Internal Zone ({{ security_private_interface | default('not configured') }}):
+        - Default target: ACCEPT
+        - Trusted sources: 10.42.0.0/16, 10.43.0.0/16
+  when: security_dry_run | default(false)

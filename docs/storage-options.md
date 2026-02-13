@@ -11,7 +11,7 @@ This document explains storage configuration options for K3s and how to integrat
 - [Rook-Ceph](#rook-ceph)
 - [Migration Strategies](#migration-strategies)
 
----
+
 
 ## Default K3s Storage
 
@@ -19,11 +19,8 @@ K3s includes a built-in **Local Path Provisioner** as the default storage class.
 
 ### Overview
 
-**Storage Class**: `local-path`  
-**Provisioner**: `rancher.io/local-path`  
-**Path**: `/var/lib/rancher/k3s/storage/`  
-**Reclaim Policy**: Delete  
-**Volume Binding Mode**: WaitForFirstConsumer
+**Storage Class**: `local-path` **Provisioner**: `rancher.io/local-path` **Path**: `/var/lib/rancher/k3s/storage/`
+**Reclaim Policy**: Delete **Volume Binding Mode**: WaitForFirstConsumer
 
 ### Characteristics
 
@@ -96,7 +93,7 @@ Then restart the local-path-provisioner:
 kubectl rollout restart deployment -n kube-system local-path-provisioner
 ```
 
----
+
 
 ## Local Path Provisioner
 
@@ -198,7 +195,7 @@ parameters:
   nodePath: /mnt/bulk-hdd
 ```
 
----
+
 
 ## Longhorn
 
@@ -283,7 +280,7 @@ To use custom storage paths, configure via values:
 defaultSettings:
   defaultDataPath: /mnt/longhorn  # Custom storage path
   defaultReplicaCount: 3
-  
+
 persistence:
   defaultClass: true
   defaultFsType: ext4
@@ -365,7 +362,7 @@ defaultSettings:
   backupTargetCredentialSecret: "longhorn-s3-secret"
 ```
 
----
+
 
 ## NFS Storage
 
@@ -478,7 +475,7 @@ Add NFS client setup to nodes:
   when: ansible_os_family == "RedHat"
 ```
 
----
+
 
 ## Rook-Ceph
 
@@ -572,7 +569,7 @@ reclaimPolicy: Delete
 allowVolumeExpansion: true
 ```
 
----
+
 
 ## Migration Strategies
 
@@ -655,7 +652,7 @@ kubectl patch storageclass longhorn -p '{"metadata": {"annotations":{"storagecla
 kubectl get storageclass
 ```
 
----
+
 
 ## Storage Comparison
 
@@ -667,7 +664,7 @@ kubectl get storageclass
 | Rook-Ceph | Distributed Block/File/Object | ✅ Yes | RWO, RWX, ROX | ⭐⭐⭐⭐ Good | ⭐⭐⭐⭐ Complex | Enterprise |
 | Cloud (EBS/PD) | Cloud Block | ✅ Cloud-managed | RWO | ⭐⭐⭐⭐ Good | ⭐⭐ Moderate | Cloud deployments |
 
----
+
 
 ## Best Practices
 
@@ -678,7 +675,7 @@ kubectl get storageclass
 5. **Testing**: Test storage failure scenarios before production
 6. **Monitoring**: Monitor storage capacity and performance
 
----
+
 
 ## See Also
 

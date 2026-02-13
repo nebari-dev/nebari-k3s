@@ -16,7 +16,8 @@ Single control plane cluster on a private network (optimized for CI performance)
   - w2: `192.168.56.22`
 - MetalLB pool: `192.168.56.200-192.168.56.210`
 
-**Note**: For HA (3 control planes), add cp2/cp3 to the Vagrantfile and hosts.ini. This single-CP config reduces CI resource usage.
+**Note**: For HA (3 control planes), add cp2/cp3 to the Vagrantfile and hosts.ini. This single-CP config reduces CI
+resource usage.
 
 ## Requirements
 
@@ -48,7 +49,7 @@ See [macOS Testing Guide](../../docs/macos-testing.md) for cloud setup instructi
 ## Bring up / destroy
 
 ```bash
-cd tests/vagrant
+cd tests/integration/vagrant
 vagrant up
 vagrant status
 ````
@@ -64,13 +65,13 @@ vagrant destroy -f
 From the **repo root**:
 
 ```bash
-ansible-playbook -i tests/vagrant/hosts.ini playbook.yaml
+ansible-playbook -i tests/integration/vagrant/hosts.ini playbooks/site.yaml
 ```
 
 If you need to force python path:
 
 ```bash
-ansible-playbook -i tests/vagrant/hosts.ini playbook.yaml \
+ansible-playbook -i tests/integration/vagrant/hosts.ini playbooks/site.yaml \
   -e ansible_python_interpreter=/usr/bin/python3
 ```
 
@@ -83,7 +84,7 @@ This lab assumes:
 * `k3s_node_cidrs: [192.168.56.0/24]`
 * `metal_lb_ip_range: "192.168.56.200-192.168.56.210"`
 
-See: `tests/vagrant/hosts.ini` [k3s_cluster:vars] section
+See: `tests/integration/vagrant/hosts.ini` [k3s_cluster:vars] section
 
 ## Security testing quick commands
 
@@ -106,5 +107,6 @@ sudo ss -tulpn
 ## Notes / gotchas
 
 * Rocky uses **firewalld** by default and is the best place to validate your `firewall_secure` role behavior.
-* This test environment uses a single control plane for CI efficiency. For HA testing (3 CPs), add cp2/cp3 to Vagrantfile and hosts.ini.
+* This test environment uses a single control plane for CI efficiency. For HA testing (3 CPs), add cp2/cp3 to
+  Vagrantfile and hosts.ini.
 * If networking assertions fail, double-check `flannel_iface` exists and has IPv4 (commonly `eth1` in Vagrant).

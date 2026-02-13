@@ -2,6 +2,9 @@
 
 A bundle of Ansible scripts and tasks for running Nebari on K3s with enterprise-grade security.
 
+> **📂 New to this repository?** See [STRUCTURE.md](STRUCTURE.md) for a complete guide to the repository layout and
+> navigation.
+
 ## 🔒 Security Features
 
 This playbook implements comprehensive security hardening for K3s clusters:
@@ -32,15 +35,15 @@ See [Operational Guide](docs/operational-guide.md) for detailed usage.
 
 ```bash
 # Validate connectivity to all nodes
-ansible-playbook -i hosts.ini connectivity-check.yaml
+ansible-playbook -i inventory/production.ini playbooks/connectivity-check.yaml
 
 # Preview what will change (dry-run)
-./scripts/dry-run.sh -i hosts.ini
+./scripts/dry-run.sh -i inventory/production.ini
 ```
 
 ### 1. Configure Your Network
 
-Edit `group_vars/all.yaml` with your actual network configuration:
+Edit `inventory/group_vars/all.yaml` with your actual network configuration:
 
 ```yaml
 # Update these with YOUR network ranges
@@ -67,20 +70,20 @@ k3s_allow_nodeports_from_admin: true # Allow admin CIDR access to NodePorts
 
 ```bash
 # Deploy the cluster
-ansible-playbook -i hosts.ini playbook.yaml
+ansible-playbook -i inventory/production.ini playbooks/site.yaml
 
 # Or just update firewall rules
-ansible-playbook -i hosts.ini playbook.yaml --tags common
+ansible-playbook -i inventory/production.ini playbooks/site.yaml --tags common
 ```
 
 ### 3. Verify Security
 
 ```bash
 # Check firewall zones
-ansible all -i hosts.ini -m shell -a "firewall-cmd --get-active-zones"
+ansible all -i inventory/production.ini -m shell -a "firewall-cmd --get-active-zones"
 
 # Verify blocked ports
-ansible all -i hosts.ini -m shell -a "firewall-cmd --zone=public --list-rich-rules | grep reject"
+ansible all -i inventory/production.ini -m shell -a "firewall-cmd --zone=public --list-rich-rules | grep reject"
 
 # Test from external host (should fail)
 nc -zv <node-ip> 6443   # API
@@ -139,13 +142,13 @@ ansible-playbook -i inventory/production.ini playbook.yaml
 ### Troubleshooting
 ```bash
 # Check specific node
-ansible-playbook -i inventory/hosts.ini connectivity-check.yaml -l problem-node -e connectivity_check_verbose=true
+ansible-playbook -i inventory/production.ini connectivity-check.yaml -l problem-node -e connectivity_check_verbose=true
 
 # Preview changes for one node
-./scripts/dry-run.sh -i inventory/hosts.ini -l problem-node
+./scripts/dry-run.sh -i inventory/production.ini -l problem-node
 
 # Re-apply configuration (idempotent)
-ansible-playbook -i inventory/hosts.ini playbook.yaml -l problem-node
+ansible-playbook -i inventory/production.ini playbook.yaml -l problem-node
 ```
 
 ## 🛡️ Security Architecture
@@ -328,13 +331,13 @@ See [SECURITY.md](SECURITY.md) for detailed troubleshooting.
 
 ```bash
 # Check firewall status
-ansible all -i hosts.ini -m shell -a "firewall-cmd --state"
+ansible all -i inventory/production.ini -m shell -a "firewall-cmd --state"
 
 # List all zones
-ansible all -i hosts.ini -m shell -a "firewall-cmd --list-all-zones"
+ansible all -i inventory/production.ini -m shell -a "firewall-cmd --list-all-zones"
 
 # Check k3s status
-ansible all -i hosts.ini -m shell -a "systemctl status k3s"
+ansible all -i inventory/production.ini -m shell -a "systemctl status k3s"
 
 # Verify cluster health
 kubectl get nodes
@@ -370,7 +373,7 @@ A comprehensive security test suite is provided to validate all security patches
 cd tests/security-suite
 
 # Test against Rocky9 vagrant lab
-./quickstart.sh ../rocky9/hosts.ini
+./quickstart.sh ../rocky9/inventory/production.ini
 
 # Test against production cluster
 ./quickstart.sh ../../inventories/production.ini reports/prod
@@ -431,7 +434,7 @@ Compare security posture before and after hardening:
 ./capture-baseline.sh OLD_CLUSTER_IP old-baseline.json
 
 # Run full test suite on new cluster
-./run-security-tests.sh -i ../rocky9/hosts.ini -o reports/
+./run-security-tests.sh -i ../rocky9/inventory/production.ini -o reports/
 
 # Generate comparison report
 ./compare-clusters.sh old-baseline.json reports/security-report.json --html comparison.html

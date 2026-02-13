@@ -4,7 +4,7 @@ on:
   pull_request:
     paths:
       - 'roles/**'
-      - 'playbook.yaml'
+      - 'playbooks/site.yaml'
       - 'scripts/dry-run.sh'
       - 'connectivity-check.yaml'
       - 'roles/connectivity_check/**'
@@ -14,7 +14,7 @@ on:
       - main
     paths:
       - 'roles/**'
-      - 'playbook.yaml'
+      - 'playbooks/site.yaml'
       - 'scripts/dry-run.sh'
       - 'connectivity-check.yaml'
   workflow_dispatch:
@@ -23,30 +23,30 @@ jobs:
   test-dry-run:
     name: Validate Dry-Run Works
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Install Ansible
         run: |
           sudo apt-get update -y
           sudo apt-get install -y ansible
           ansible --version
-      
+
       - name: Test dry-run script syntax
         run: |
           bash -n scripts/dry-run.sh
           echo "✓ Dry-run script syntax OK"
-      
+
       - name: Test dry-run help
         run: |
           scripts/dry-run.sh --help
-      
+
       - name: Validate playbook syntax
         run: |
-          ansible-playbook playbook.yaml --syntax-check
+          ansible-playbook playbooks/site.yaml --syntax-check
           echo "✓ Playbook syntax OK"
-      
+
       - name: Validate connectivity-check playbook
         run: |
           ansible-playbook connectivity-check.yaml --syntax-check
@@ -55,15 +55,15 @@ jobs:
   test-docker-script:
     name: Validate Docker Test Script
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Test docker script syntax
         run: |
           bash -n scripts/test-docker.sh
           echo "✓ Docker test script syntax OK"
-      
+
       - name: Test docker script help
         run: |
           scripts/test-docker.sh --help
@@ -71,36 +71,36 @@ jobs:
   role-validation:
     name: Validate Role Structure
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Check all roles have required structure
         run: |
           for role in roles/*/; do
             role_name=$(basename "$role")
             echo "Checking role: $role_name"
-            
+
             if [ ! -d "$role/tasks" ]; then
               echo "ERROR: $role_name missing tasks/ directory"
               exit 1
             fi
-            
+
             if [ ! -f "$role/tasks/main.yaml" ] && [ ! -f "$role/tasks/main.yml" ]; then
               echo "ERROR: $role_name missing tasks/main.yaml"
               exit 1
             fi
-            
+
             echo "✓ $role_name structure OK"
           done
-      
+
       - name: Check for common issues
         run: |
           # Check for hard-coded IPs
           if grep -r "192\.168\." roles/*/tasks/ --include="*.yaml" --include="*.yml" | grep -v "# "; then
             echo "WARNING: Found hard-coded IPs in roles"
           fi
-          
+
           # Check for passwords in clear text
           if grep -rE "(password|passwd|pwd):\s*['\"]?[^{]" roles/*/tasks/ --include="*.yaml" --include="*.yml"; then
             echo "WARNING: Possible clear-text passwords found"
@@ -110,58 +110,58 @@ jobs:
     name: Full Integration Test (Rocky9)
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch'
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Install dependencies
         run: |
           sudo apt-get update -y
           sudo apt-get install -y ansible vagrant
-          
+
           # Install libvirt
           sudo apt-get install -y \
             qemu-kvm libvirt-daemon-system libvirt-clients \
             libvirt-dev pkg-config ruby-dev gcc g++ make
-          
+
           # Start libvirt
           sudo systemctl start libvirtd
           sudo usermod -aG libvirt,kvm "$USER"
-          
+
           # Install vagrant plugin
           vagrant plugin install vagrant-libvirt
-      
+
       - name: Start test VMs
         timeout-minutes: 20  # Fail fast if VMs don't start
         run: |
-          cd tests/vagrant
-          
+          cd tests/integration/vagrant
+
           # Check libvirt network status
           sg libvirt -c "virsh net-list --all" || true
           sg libvirt -c "virsh net-start default" || true
-          
+
           # Start VMs (3 VMs can start in parallel without resource issues)
           sg libvirt -c "vagrant up --provider=libvirt"
-      
+
       - name: Run connectivity check
         run: |
-          ansible-playbook -i tests/vagrant/hosts.ini connectivity-check.yaml
-      
+          ansible-playbook -i tests/integration/vagrant/hosts.ini connectivity-check.yaml
+
       - name: Run dry-run
         run: |
-          ./scripts/dry-run.sh -i tests/vagrant/hosts.ini
-      
+          ./scripts/dry-run.sh -i tests/integration/vagrant/hosts.ini
+
       - name: Deploy cluster
         run: |
-          ansible-playbook -i tests/vagrant/hosts.ini playbook.yaml
-      
+          ansible-playbook -i tests/integration/vagrant/hosts.ini playbooks/site.yaml
+
       - name: Verify cluster
         run: |
           # Add verification commands here
           echo "Cluster deployed successfully"
-      
+
       - name: Cleanup
         if: always()
         run: |
-          cd tests/vagrant
+          cd tests/integration/vagrant
           sg libvirt -c "vagrant destroy -f" || true
