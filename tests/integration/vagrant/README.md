@@ -45,8 +45,8 @@ vagrant up
 # Note: dnf commands will fail without subscription-manager registration
 ```
 
-The bootstrap script automatically handles unlicensed RHEL by skipping system updates
-when package manager access is unavailable.
+The bootstrap script automatically handles unlicensed RHEL by skipping system updates when package manager access is
+unavailable.
 
 ### ⚠️ macOS Apple Silicon Users
 

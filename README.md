@@ -5,7 +5,8 @@ A bundle of Ansible scripts and tasks for running Nebari on K3s with enterprise-
 > **📂 New to this repository?** See [STRUCTURE.md](STRUCTURE.md) for a complete guide to the repository layout and
 > navigation.
 
-> **⚙️ Configuration:** The repository includes an `ansible.cfg` file that configures Ansible to find roles, inventory, and other settings automatically. All commands should be run from the repository root.
+> **⚙️ Configuration:** The repository includes an `ansible.cfg` file that configures Ansible to find roles, inventory,
+> and other settings automatically. All commands should be run from the repository root.
 
 ## 🔒 Security Features
 

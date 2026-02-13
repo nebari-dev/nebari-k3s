@@ -73,7 +73,8 @@ nebari-k3s/
 
 ## Quick Navigation
 
-> **Note:** All commands should be run from the repository root. The `ansible.cfg` file ensures Ansible finds roles, inventory, and uses appropriate defaults automatically.
+> **Note:** All commands should be run from the repository root. The `ansible.cfg` file ensures Ansible finds roles,
+> inventory, and uses appropriate defaults automatically.
 
 ### Common Tasks
 
