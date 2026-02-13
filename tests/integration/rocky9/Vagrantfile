@@ -47,7 +47,7 @@ Vagrant.configure("2") do |config|
         qe.net_device = "virtio-net-pci"
       end
 
-      vm.vm.provision "shell", path: "scripts/bootstrap.sh", env: {
+      vm.vm.provision "shell", path: "../vagrant/scripts/bootstrap.sh", env: {
         "STATIC_IP" => n[:ip],
         "VIP" => VIP
       }

@@ -63,13 +63,17 @@ nebari-k3s/
 │   └── benchmarks/        # Security benchmark configs
 │
 └── [root files]
+    ├── ansible.cfg        # Ansible configuration (roles path, defaults)
     ├── README.md          # Project overview (you are here via link)
+    ├── STRUCTURE.md       # This file
     ├── LICENSE
     ├── Makefile
     └── .gitignore
 ```
 
 ## Quick Navigation
+
+> **Note:** All commands should be run from the repository root. The `ansible.cfg` file ensures Ansible finds roles, inventory, and uses appropriate defaults automatically.
 
 ### Common Tasks
 

@@ -29,6 +29,25 @@ resource usage.
 
 The default box is `generic/rocky9` which supports multiple providers.
 
+### 📦 Box Choice: Rocky Linux vs RHEL
+
+**Rocky Linux (default)**: No subscription required, drop-in replacement for RHEL
+```bash
+# Uses Rocky Linux 9 (default)
+vagrant up
+```
+
+**RHEL**: Requires valid Red Hat subscription for package manager
+```bash
+# If using RHEL box (not recommended for testing)
+export ROCKY_BOX_NAME="generic/rhel9"
+vagrant up
+# Note: dnf commands will fail without subscription-manager registration
+```
+
+The bootstrap script automatically handles unlicensed RHEL by skipping system updates
+when package manager access is unavailable.
+
 ### ⚠️ macOS Apple Silicon Users
 
 Vagrant with QEMU has severe limitations on Apple Silicon:
