@@ -17,6 +17,8 @@
       {{ extra_agent_args }} \
       --token={{ k3s_token }} \
       --server https://{{ apiserver_endpoint }}:6443
+  environment:
+    INSTALL_K3S_VERSION: "{{ k3s_version }}"
 
 # - name: Join other masters to the cluster
 #   command: /tmp/install_k3s.sh server --token {{ k3s_token }} --tls-san {{ apiserver_endpoint }} --disable servicelb --disable traefik --server https://{{ groups['master'][0] }}:6443
