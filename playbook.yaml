@@ -17,27 +17,31 @@
   roles:
     - role: k3s_worker
 
-# Label nodes for Nebari node groups from inventory group membership. Put each
-# host in a node-group inventory group -- [general], [user], [worker], or any
-# custom group such as [gpu-v100] -- and it gets a node-role.nebari.io/group=<group>
-# label. Group names are arbitrary and expandable; infra/meta groups are excluded.
-# Runs last (all nodes have joined). Standalone: --tags labels
+# Label nodes for Nebari node groups from inventory group membership. Put each host
+# in one or more node-group inventory groups -- [general], [user], [worker], or any
+# custom group such as [gpu-v100] -- and it gets a node-role.nebari.io/<group>=true
+# label PER group. Using a separate key per group (rather than one shared key with
+# the group as the value) lets a node belong to SEVERAL groups at once (e.g. both
+# 'user' and 'worker'). Group names are arbitrary/expandable; infra/meta groups are
+# excluded. Runs last (all nodes have joined). Standalone: --tags labels
 - name: Label nodes for Nebari node groups
   hosts: k3s_cluster
   gather_facts: false
   become: true
   tags: labels
   vars:
-    # Label key for node groups (override if the convention changes).
-    nebari_node_group_label_key: node-role.nebari.io/group
-    # Inventory groups that are NOT node-group labels (infra/meta). Any other
-    # group a host belongs to becomes a label value.
+    # Each group becomes the label "<prefix><group>=<value>". Per-group keys allow
+    # multi-group membership; override the prefix/value if the convention changes.
+    nebari_node_group_label_prefix: "node-role.nebari.io/"
+    nebari_node_group_label_value: "true"
+    # Inventory groups that are NOT node-group labels (infra/meta). Any other group
+    # a host belongs to becomes a label.
     nebari_label_exclude_groups: [all, ungrouped, k3s_cluster, master, node]
   tasks:
-    - name: Apply node-group labels from inventory group membership
+    - name: Apply per-group node labels from inventory group membership
       ansible.builtin.command: >-
         {{ k3s_binary_path | default('k3s') }} kubectl label node {{ inventory_hostname }}
-        {{ nebari_node_group_label_key }}={{ item }} --overwrite
+        {{ nebari_node_group_label_prefix }}{{ item }}={{ nebari_node_group_label_value }} --overwrite
       loop: "{{ group_names | difference(nebari_label_exclude_groups) }}"
       delegate_to: "{{ groups['master'][0] }}"
       register: label_result
