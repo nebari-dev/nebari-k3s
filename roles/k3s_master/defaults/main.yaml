@@ -48,8 +48,13 @@ install_k9s: false
 k9s_version: v0.32.7
 
 #################################
-# kube-vip
+# kube-vip (optional)
 #################################
+
+# Deploy kube-vip (control-plane VIP). Off by default; opt in with
+# install_kube_vip: true (requires a free VIP set in apiserver_endpoint). For a
+# single master, leave off and point apiserver_endpoint at the master's node IP.
+install_kube_vip: false
 
 # enable kube-vip ARP broadcasts
 kube_vip_arp: true
@@ -64,8 +69,14 @@ kube_vip_tag_version: v0.8.2
 
 
 #################################
-# MetalLB
+# MetalLB (optional)
 #################################
+
+# Deploy MetalLB for LoadBalancer IPs. Off by default; opt in with
+# install_metallb: true (needs a free range in metal_lb_ip_range). If off, keep
+# k3s servicelb enabled (don't pass --disable servicelb) to get LoadBalancer IPs
+# on the node addresses.
+install_metallb: false
 
 # metallb type frr or native
 metal_lb_type: native

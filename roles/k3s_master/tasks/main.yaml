@@ -7,12 +7,16 @@
 - name: Deploy vip manifest
   ansible.builtin.include_tasks: kube_vip.yaml
   tags: kube_vip
-  when: inventory_hostname == groups['master'][0]
+  when:
+    - install_kube_vip | bool
+    - inventory_hostname == groups['master'][0]
 
 - name: Deploy metallb manifest
   ansible.builtin.include_tasks: metallb.yaml
   tags: metallb
-  when: inventory_hostname == groups['master'][0]
+  when:
+    - install_metallb | bool
+    - inventory_hostname == groups['master'][0]
 
 # deploy once on first master
 - name: Install k9s
