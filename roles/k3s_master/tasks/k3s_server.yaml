@@ -2,7 +2,7 @@
 
 - name: Get IPv4 address of the flannel interface
   shell: >-
-    ip -4 addr show {{ flannel_iface }} | grep -oP '(?<=inet\s)\d+(\.\d+){3}'
+    ip -4 addr show {{ flannel_iface }} | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -n1
   register: master_ip
   delegate_to: "{{ groups['master'][0] }}"
   changed_when: false
@@ -109,7 +109,6 @@
 - name: Store Master node-token
   ansible.builtin.set_fact:
     token: "{{ node_token.content | b64decode | regex_replace('\n', '') }}"
-    delegate_to: localhost
   run_once: true
 
 # print current inventory_hostname and value of token | default(k3s_token)

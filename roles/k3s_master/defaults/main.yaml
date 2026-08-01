@@ -31,8 +31,8 @@ server_init_args: >-
     {% else %}
       --server https://{{ master_ip | default('') }}:6443
     {% endif %}
-    --token {{ k3s_token }}
   {% endif %}
+  --token {{ k3s_token }}
   {{ extra_server_args }}
 
 # interface which will be used for flannel

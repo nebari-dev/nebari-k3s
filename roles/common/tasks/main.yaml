@@ -47,10 +47,15 @@
 # Step 1: Install Kernel Headers
 # =====================================================================
 - name: Install kernel headers (kernel-devel) for current kernel
+  # kernel-devel is subscription-gated on RHEL; on unlicensed/dev RHEL hosts it
+  # may be unavailable. k3s doesn't need it for basic operation, so a missing
+  # package must not abort the play.
   ansible.builtin.package:
     name: "kernel-devel-{{ ansible_kernel }}"
     state: present
   when: ansible_os_family == "RedHat"
+  register: kernel_devel_install
+  failed_when: false
 
 # =====================================================================
 # Step 2: Add / Load Kernel Modules for Kubernetes
@@ -66,7 +71,6 @@
       ip_vs_sh
       overlay
     mode: '0644'
-  when: ansible_os_family == "RedHat"
 
 - name: Load required kernel modules
   community.general.modprobe:
@@ -79,14 +83,19 @@
     - ip_vs_wrr
     - ip_vs_sh
     - overlay
-  when: ansible_os_family == "RedHat"
 
-# Install nfs-common package for NFS storage mounting
-- name: Install nfs-common package
+# Install the NFS client for NFS storage mounting (per-OS-family package name)
+- name: Install NFS client (RedHat)
   ansible.builtin.package:
     name: nfs-utils
     state: present
   when: ansible_os_family == "RedHat"
+
+- name: Install NFS client (Debian)
+  ansible.builtin.package:
+    name: nfs-common
+    state: present
+  when: ansible_os_family == "Debian"
 
 # =====================================================================
 # Step 3: Configure Sysctl
@@ -99,11 +108,9 @@
       net.bridge.bridge-nf-call-ip6tables = 1
       net.bridge.bridge-nf-call-iptables = 1
     mode: '0644'
-  when: ansible_os_family == "RedHat"
 
 - name: Reload sysctl settings
   ansible.builtin.command: sysctl --system
-  when: ansible_os_family == "RedHat"
 
 # =====================================================================
 # (Optional) Disable SELinux

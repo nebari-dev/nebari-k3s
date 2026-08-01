@@ -1,4 +1,8 @@
 k3s_token: some-secret-password
 
+# Interface for flannel on the agent. Falls back to eth1 (vagrant default) unless
+# flannel_iface is set via group_vars/inventory.
+flannel_iface: eth1
+
 extra_agent_args: >-
-  --flannel-iface=eth1
+  --flannel-iface={{ flannel_iface }}
