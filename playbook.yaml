@@ -17,24 +17,28 @@
   roles:
     - role: k3s_worker
 
-# Label nodes for Nebari node groups based on inventory group membership.
-# Put hosts in the [general] / [user] / [worker] inventory groups; each becomes a
-# node-role.nebari.io/group=<group> label. Runs last so all nodes have joined.
-# Run standalone with: --tags labels
+# Label nodes for Nebari node groups from inventory group membership. Put each
+# host in a node-group inventory group -- [general], [user], [worker], or any
+# custom group such as [gpu-v100] -- and it gets a node-role.nebari.io/group=<group>
+# label. Group names are arbitrary and expandable; infra/meta groups are excluded.
+# Runs last (all nodes have joined). Standalone: --tags labels
 - name: Label nodes for Nebari node groups
   hosts: k3s_cluster
   gather_facts: false
   become: true
   tags: labels
+  vars:
+    # Label key for node groups (override if the convention changes).
+    nebari_node_group_label_key: node-role.nebari.io/group
+    # Inventory groups that are NOT node-group labels (infra/meta). Any other
+    # group a host belongs to becomes a label value.
+    nebari_label_exclude_groups: [all, ungrouped, k3s_cluster, master, node]
   tasks:
-    - name: Apply node-role.nebari.io/group label from inventory group membership
+    - name: Apply node-group labels from inventory group membership
       ansible.builtin.command: >-
         {{ k3s_binary_path | default('k3s') }} kubectl label node {{ inventory_hostname }}
-        node-role.nebari.io/group={{ item }} --overwrite
-      loop: "{{ nebari_node_groups | default(['general', 'user', 'worker']) }}"
-      when:
-        - item in groups
-        - inventory_hostname in groups[item]
+        {{ nebari_node_group_label_key }}={{ item }} --overwrite
+      loop: "{{ group_names | difference(nebari_label_exclude_groups) }}"
       delegate_to: "{{ groups['master'][0] }}"
       register: label_result
       changed_when: "'not labeled' not in label_result.stdout"
