@@ -1,7 +1,25 @@
 ---
-- name: Install k9s (use RPM on Rocky 9)
-  ansible.builtin.shell: |
-    wget https://github.com/derailed/k9s/releases/download/v0.32.7/k9s_Linux_amd64.rpm
-    dnf install -y ./k9s_Linux_amd64.rpm
-    rm k9s_Linux_amd64.rpm
-  when: ansible_facts['os_family'] == 'RedHat'
+# Install the k9s TUI as a static binary (distro-agnostic, amd64/arm64). Gated by
+# install_k9s in the role defaults; version via k9s_version. First master only.
+- name: Download k9s release tarball
+  ansible.builtin.get_url:
+    url: >-
+      https://github.com/derailed/k9s/releases/download/{{ k9s_version }}/k9s_Linux_{{ 'arm64' if ansible_facts['architecture'] == 'aarch64' else 'amd64' }}.tar.gz
+    dest: /tmp/k9s.tar.gz
+    mode: '0644'
+
+- name: Install the k9s binary to /usr/local/bin
+  ansible.builtin.unarchive:
+    src: /tmp/k9s.tar.gz
+    dest: /usr/local/bin
+    remote_src: true
+    include:
+      - k9s
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Remove the k9s tarball
+  ansible.builtin.file:
+    path: /tmp/k9s.tar.gz
+    state: absent

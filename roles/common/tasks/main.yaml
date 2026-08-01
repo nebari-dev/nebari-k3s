@@ -17,7 +17,7 @@
   ansible.builtin.package:
     name: ufw
     state: present
-  when : ansible_os_family == 'Debian'
+  when : ansible_facts['os_family'] == 'Debian'
 
 - name: Allow base ports (tcp)
   ufw:
@@ -28,7 +28,7 @@
     - 6443
     - 443
     - 7946 # Metallb
-  when : ansible_os_family == 'Debian'
+  when : ansible_facts['os_family'] == 'Debian'
 
 - name: Allow base ports (udp)
   ufw:
@@ -39,7 +39,7 @@
     - 6443
     - 443
     - 7946 # Metallb
-  when : ansible_os_family == 'Debian'
+  when : ansible_facts['os_family'] == 'Debian'
 
 # https://infotechys.com/install-a-kubernetes-cluster-on-rhel-9/
 
@@ -51,9 +51,9 @@
   # may be unavailable. k3s doesn't need it for basic operation, so a missing
   # package must not abort the play.
   ansible.builtin.package:
-    name: "kernel-devel-{{ ansible_kernel }}"
+    name: "kernel-devel-{{ ansible_facts['kernel'] }}"
     state: present
-  when: ansible_os_family == "RedHat"
+  when: ansible_facts['os_family'] == "RedHat"
   register: kernel_devel_install
   failed_when: false
 
@@ -89,13 +89,13 @@
   ansible.builtin.package:
     name: nfs-utils
     state: present
-  when: ansible_os_family == "RedHat"
+  when: ansible_facts['os_family'] == "RedHat"
 
 - name: Install NFS client (Debian)
   ansible.builtin.package:
     name: nfs-common
     state: present
-  when: ansible_os_family == "Debian"
+  when: ansible_facts['os_family'] == "Debian"
 
 # =====================================================================
 # Step 3: Configure Sysctl
@@ -118,7 +118,7 @@
 # - name: Set SELinux to disabled state
 #   ansible.posix.selinux:
 #     state: disabled
-#   when: ansible_os_family == "RedHat"
+#   when: ansible_facts['os_family'] == "RedHat"
 
 # =====================================================================
 # (Optional) Steps 5: Install and Configure Containerd
@@ -142,7 +142,7 @@
     - 443
     - 9990 # Keycloak management console
     - 7946 # Metallb
-  when: ansible_os_family == "RedHat"
+  when: ansible_facts['os_family'] == "RedHat"
 
 - name: Open Kubernetes-related ports in Firewalld (TCP)
   ansible.posix.firewalld:
@@ -160,7 +160,7 @@
     - 10255
     - 5473
     - 7946 # Metallb
-  when: ansible_os_family == "RedHat"
+  when: ansible_facts['os_family'] == "RedHat"
 
 - name: Open Kubernetes-related ports in Firewalld (UDP)
   ansible.posix.firewalld:
@@ -174,7 +174,7 @@
     - 51820
     - 51821
     - 7946 # Metallb
-  when: ansible_os_family == "RedHat"
+  when: ansible_facts['os_family'] == "RedHat"
 
 # ---------------------------------------------------------------------
 # Add the two "trusted" sources for pods and services
@@ -188,7 +188,7 @@
     state: enabled
     permanent: yes
     immediate: yes
-  when: ansible_os_family == "RedHat"
+  when: ansible_facts['os_family'] == "RedHat"
 
 - name: Allow service subnet in the trusted zone
   ansible.posix.firewalld:
@@ -197,21 +197,21 @@
     state: enabled
     permanent: yes
     immediate: yes
-  when: ansible_os_family == "RedHat"
+  when: ansible_facts['os_family'] == "RedHat"
 # ---------------------------------------------------------------------
 
 - name: Reload firewalld
   ansible.posix.firewalld:
     state: enabled
     immediate: yes
-  when: ansible_os_family == "RedHat"
+  when: ansible_facts['os_family'] == "RedHat"
 
 # =====================================================================
 # (Optional) Reboot System
 # =====================================================================
 # - name: Reboot the machine (Optional)
 #   ansible.builtin.reboot:
-#   when: ansible_os_family == "RedHat"
+#   when: ansible_facts['os_family'] == "RedHat"
 
 - name: Set containerd pull schema env var system-wide
   ansible.builtin.lineinfile:
@@ -220,4 +220,4 @@
     line: 'CONTAINERD_ENABLE_DEPRECATED_PULL_SCHEMA_1_IMAGE=1'
     create: yes
     state: present
-  when: ansible_os_family == "RedHat"
+  when: ansible_facts['os_family'] == "RedHat"

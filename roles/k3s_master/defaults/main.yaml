@@ -39,6 +39,15 @@ server_init_args: >-
 flannel_iface: eth1 # (vagrant uses eth1)
 
 #################################
+# k9s (optional)
+#################################
+
+# Install the k9s TUI binary on the first master. Off by default; opt in with
+# install_k9s: true (or -e install_k9s=true).
+install_k9s: false
+k9s_version: v0.32.7
+
+#################################
 # kube-vip
 #################################
 
